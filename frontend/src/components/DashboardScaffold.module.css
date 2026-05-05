@@ -1,0 +1,45 @@
+.bodyGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr);
+  gap: 26px;
+  align-items: start;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.sectionLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--db-ink-40);
+}
+
+.sectionLabel::before {
+  content: "";
+  width: 18px;
+  height: 1px;
+  flex-shrink: 0;
+  background: var(--db-accent);
+}
+
+@media (max-width: 1060px) {
+  .bodyGrid {
+    grid-template-columns: 1fr;
+  }
+}

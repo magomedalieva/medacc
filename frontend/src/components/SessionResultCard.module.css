@@ -1,0 +1,28 @@
+.card {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  box-shadow: var(--shadow-md);
+}
+
+.score {
+  font-family: var(--font-serif);
+  font-size: clamp(64px, 10vw, 96px);
+  line-height: 0.9;
+}
+
+.pass {
+  color: var(--green);
+}
+
+.fail {
+  color: var(--accent);
+}
+
+.subtitle {
+  color: var(--ink-light);
+  line-height: 1.6;
+}

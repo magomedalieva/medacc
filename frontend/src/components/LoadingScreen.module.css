@@ -1,0 +1,49 @@
+.shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
+.card {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 18px;
+  padding: 28px;
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  box-shadow: var(--shadow-sm);
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: 30px;
+  line-height: 1.04;
+  color: var(--ink);
+}
+
+.track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--paper-dark);
+}
+
+.fill {
+  width: 40%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--green) 0%, var(--accent) 100%);
+  animation: pulse 1.3s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(140%);
+  }
+}

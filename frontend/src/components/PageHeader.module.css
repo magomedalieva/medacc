@@ -1,0 +1,45 @@
+.shell {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.content {
+  display: grid;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(32px, 4vw, 44px);
+  line-height: 0.98;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.subtitle {
+  margin: 0;
+  max-width: 760px;
+  color: var(--ink-light);
+}
+
+.aside {
+  display: flex;
+  align-items: flex-end;
+}
+
+@media (max-width: 860px) {
+  .shell {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .aside {
+    align-items: stretch;
+  }
+}

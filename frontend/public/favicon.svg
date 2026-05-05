@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="190 30 300 300" role="img" aria-labelledby="title desc">
+  <title id="title">MedAcc mark</title>
+  <desc id="desc">Student with medical graduation cap inside shield and ECG line</desc>
+  <defs>
+    <clipPath id="medacc-mark-clip">
+      <rect x="190" y="30" width="300" height="300" rx="72" />
+    </clipPath>
+  </defs>
+
+  <rect x="190" y="30" width="300" height="300" rx="72" fill="#8B1A2F" />
+  <circle cx="450" cy="70" r="150" fill="#7A1628" clip-path="url(#medacc-mark-clip)" />
+  <circle cx="205" cy="318" r="95" fill="#7A1628" clip-path="url(#medacc-mark-clip)" />
+
+  <path
+    d="M 340 72 L 414 104 L 414 190 C 414 232, 340 258, 340 258 C 340 258, 266 232, 266 190 L 266 104 Z"
+    fill="#F5EDE9"
+    clip-path="url(#medacc-mark-clip)"
+  />
+  <path
+    d="M 340 87 L 404 116 L 404 189 C 404 225, 340 248, 340 248 C 340 248, 276 225, 276 189 L 276 116 Z"
+    fill="#8B1A2F"
+    clip-path="url(#medacc-mark-clip)"
+  />
+
+  <circle cx="340" cy="170" r="22" fill="#F5EDE9" clip-path="url(#medacc-mark-clip)" />
+  <path
+    d="M 310 192 C 306 200, 304 210, 304 220 L 304 248 C 316 252, 328 254, 340 254 C 352 254, 364 252, 376 248 L 376 220 C 376 210, 374 200, 370 192 C 362 197, 352 200, 340 200 C 328 200, 318 197, 310 192 Z"
+    fill="#F5EDE9"
+    clip-path="url(#medacc-mark-clip)"
+  />
+
+  <line x1="334" y1="200" x2="329" y2="220" stroke="#8B1A2F" stroke-width="2.5" stroke-linecap="round" clip-path="url(#medacc-mark-clip)" />
+  <line x1="346" y1="200" x2="351" y2="220" stroke="#8B1A2F" stroke-width="2.5" stroke-linecap="round" clip-path="url(#medacc-mark-clip)" />
+  <path
+    d="M 327 202 C 322 214, 322 230, 332 237 C 337 241, 343 241, 348 237 C 358 230, 358 214, 353 202"
+    fill="none"
+    stroke="#8B1A2F"
+    stroke-width="3"
+    stroke-linecap="round"
+    clip-path="url(#medacc-mark-clip)"
+  />
+  <circle cx="340" cy="238" r="5.5" fill="#8B1A2F" clip-path="url(#medacc-mark-clip)" />
+
+  <rect x="315" y="146" width="50" height="8" rx="2.5" fill="#F5EDE9" clip-path="url(#medacc-mark-clip)" />
+  <path
+    d="M 321 154 L 340 146 L 359 154 L 359 164 C 359 170, 350 174, 340 174 C 330 174, 321 170, 321 164 Z"
+    fill="#F5EDE9"
+    clip-path="url(#medacc-mark-clip)"
+  />
+  <line x1="365" y1="149" x2="371" y2="168" stroke="#F5EDE9" stroke-width="2.5" stroke-linecap="round" clip-path="url(#medacc-mark-clip)" />
+  <circle cx="371" cy="171" r="4" fill="#F5EDE9" clip-path="url(#medacc-mark-clip)" />
+  <rect x="337" y="155" width="6" height="16" rx="1.5" fill="#8B1A2F" clip-path="url(#medacc-mark-clip)" />
+  <rect x="333" y="159" width="14" height="6" rx="1.5" fill="#8B1A2F" clip-path="url(#medacc-mark-clip)" />
+
+  <line x1="205" y1="296" x2="475" y2="296" stroke="#F5EDE9" stroke-width="1.5" stroke-opacity="0.15" clip-path="url(#medacc-mark-clip)" />
+  <polyline
+    points="208,296 245,296 257,296 268,268 281,322 294,262 307,296 333,296 347,296 358,268 371,322 384,262 397,296 472,296"
+    fill="none"
+    stroke="#F5EDE9"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    clip-path="url(#medacc-mark-clip)"
+  />
+  <g clip-path="url(#medacc-mark-clip)">
+    <circle cx="208" cy="296" r="4" fill="#F5EDE9" opacity="0.88" />
+  </g>
+</svg>

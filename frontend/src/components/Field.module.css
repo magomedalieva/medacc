@@ -1,0 +1,70 @@
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.control,
+.select,
+.textarea {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--rule);
+  background: white;
+  color: var(--ink);
+  border-radius: 2px;
+  padding: 12px 14px;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.control:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(185, 28, 58, 0.08);
+}
+
+.textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.searchShell {
+  display: grid;
+  gap: 8px;
+  min-width: min(100%, 320px);
+}
+
+.searchLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.searchInput {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+  border-radius: 2px;
+  padding: 12px 14px;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(185, 28, 58, 0.08);
+}

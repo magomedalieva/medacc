@@ -1,0 +1,18 @@
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.title::before {
+  content: "";
+  width: 10px;
+  height: 1px;
+  background: var(--accent);
+}

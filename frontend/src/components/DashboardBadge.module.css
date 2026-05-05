@@ -1,0 +1,117 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: transparent;
+  color: var(--db-ink-70);
+}
+
+.badge + .badge::before {
+  content: "";
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+}
+
+.default {
+  color: var(--db-ink-70);
+}
+
+.accent {
+  color: var(--db-accent);
+}
+
+.green {
+  color: var(--db-green);
+}
+
+.gold {
+  color: var(--db-gold);
+}
+
+.pulse {
+  display: none;
+}
+
+.pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.pulseAccent {
+  background: var(--db-accent);
+}
+
+.pulseAccent::after {
+  animation: pulseAccent 2s ease infinite;
+}
+
+.pulseGreen {
+  background: var(--db-green);
+}
+
+.pulseGreen::after {
+  animation: pulseGreen 2s ease infinite;
+}
+
+.pulseGold {
+  background: var(--db-gold);
+}
+
+.pulseGold::after {
+  animation: pulseGold 2s ease infinite;
+}
+
+@keyframes pulseAccent {
+  0% {
+    box-shadow: 0 0 0 0 rgba(185, 28, 58, 0.6);
+  }
+
+  65% {
+    box-shadow: 0 0 0 6px rgba(185, 28, 58, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(185, 28, 58, 0);
+  }
+}
+
+@keyframes pulseGreen {
+  0% {
+    box-shadow: 0 0 0 0 rgba(26, 92, 62, 0.6);
+  }
+
+  65% {
+    box-shadow: 0 0 0 6px rgba(26, 92, 62, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(45, 106, 79, 0);
+  }
+}
+
+@keyframes pulseGold {
+  0% {
+    box-shadow: 0 0 0 0 rgba(138, 109, 46, 0.5);
+  }
+
+  65% {
+    box-shadow: 0 0 0 6px rgba(138, 109, 46, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(196, 163, 90, 0);
+  }
+}

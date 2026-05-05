@@ -1,0 +1,176 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap");
+
+.page {
+  --ink: #0c0c0c;
+  --ink-70: rgba(12, 12, 12, 0.7);
+  --ink-40: rgba(12, 12, 12, 0.4);
+  --ink-15: rgba(12, 12, 12, 0.15);
+  --ink-07: rgba(12, 12, 12, 0.07);
+  --paper: #f5f3ee;
+  --surface: #fff;
+  --rule: rgba(12, 12, 12, 0.09);
+  --accent: #b91c3a;
+  --accent-lo: rgba(185, 28, 58, 0.1);
+  --accent-mid: rgba(185, 28, 58, 0.28);
+  --green: #1a5c3e;
+  --green-lo: rgba(26, 92, 62, 0.1);
+  --green-mid: rgba(26, 92, 62, 0.28);
+  --gold: #8a6d2e;
+  --gold-lo: rgba(138, 109, 46, 0.1);
+  --gold-mid: rgba(138, 109, 46, 0.28);
+  --fs: "DM Serif Display", Georgia, serif;
+  --fm: "IBM Plex Mono", monospace;
+  --fn: "IBM Plex Sans", sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  min-height: 100vh;
+  font-family: var(--fn);
+  color: var(--ink);
+  background: var(--paper);
+  background-image:
+    radial-gradient(ellipse 55% 35% at 2% 0%, rgba(185, 28, 58, 0.035) 0%, transparent 100%),
+    radial-gradient(ellipse 45% 45% at 98% 100%, rgba(26, 92, 62, 0.03) 0%, transparent 100%);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.55;
+}
+
+.topLine {
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--green) 55%, var(--gold) 100%);
+}
+
+.hd {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  background: rgba(245, 243, 238, 0.96);
+  backdrop-filter: blur(22px);
+  border-bottom: 1px solid var(--rule);
+}
+
+.hdIn {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 28px;
+  height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.hdGroup {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  font-family: var(--fs);
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  gap: 1px;
+}
+
+.navA {
+  padding: 7px 13px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--fm);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-40);
+  transition:
+    color 140ms,
+    background 140ms;
+  cursor: pointer;
+  position: relative;
+  text-decoration: none;
+}
+
+.navA:hover {
+  color: var(--ink);
+  background: var(--ink-07);
+}
+
+.navA.on,
+.on {
+  color: var(--ink);
+}
+
+.navA.on::after,
+.on::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  bottom: 0;
+  height: 1.5px;
+  background: var(--accent);
+  border-radius: 1px;
+}
+
+.hdUser {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ava {
+  width: 34px;
+  height: 34px;
+  border-radius: 3px;
+  background: var(--ink);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--fm);
+  font-size: 9px;
+  font-weight: 700;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.ava::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(130deg, var(--accent) 0%, transparent 50%);
+  opacity: 0.7;
+}
+
+.ava span {
+  position: relative;
+  z-index: 1;
+}
+
+.hdUname {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.hdUrole {
+  font-family: var(--fm);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-40);
+}
+
+@media (max-width: 480px) {
+  .hdIn {
+    padding: 0 16px;
+  }
+}

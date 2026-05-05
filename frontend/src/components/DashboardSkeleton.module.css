@@ -1,0 +1,51 @@
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr);
+  gap: 26px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.block {
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    rgba(12, 12, 12, 0.05) 25%,
+    rgba(12, 12, 12, 0.09) 50%,
+    rgba(12, 12, 12, 0.05) 75%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.5s ease infinite;
+}
+
+.large {
+  min-height: 290px;
+}
+
+.medium {
+  min-height: 170px;
+}
+
+.small {
+  min-height: 110px;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (max-width: 1060px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

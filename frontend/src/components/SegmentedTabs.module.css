@@ -1,0 +1,27 @@
+.tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: rgba(240, 237, 232, 0.7);
+}
+
+.tab {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.active {
+  background: white;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}

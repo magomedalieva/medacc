@@ -1,0 +1,32 @@
+[project]
+name = "medacc-backend"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "alembic>=1.14.0",
+    "asyncpg>=0.30.0",
+    "bcrypt<4",
+    "email-validator>=2.2.0",
+    "fastapi>=0.116.0",
+    "passlib[bcrypt]>=1.7.4",
+    "pydantic-settings>=2.10.0",
+    "python-jose[cryptography]>=3.4.0",
+    "sqlalchemy[asyncio]>=2.0.40",
+    "uvicorn[standard]>=0.35.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_classes = ["*Tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]

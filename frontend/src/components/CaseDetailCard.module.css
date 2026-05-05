@@ -1,0 +1,100 @@
+.card {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  box-shadow: var(--shadow-md);
+}
+
+.head {
+  display: grid;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.subtitle,
+.summary {
+  color: var(--ink-light);
+}
+
+.summary {
+  margin: 0;
+  line-height: 1.7;
+}
+
+.factGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.fact {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  background: rgba(250, 248, 245, 0.92);
+  border: 1px solid rgba(212, 208, 200, 0.8);
+}
+
+.factLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+
+.factValue {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--ink-light);
+}
+
+.meta strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.noteGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.note {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  background: rgba(250, 248, 245, 0.92);
+  border: 1px solid rgba(212, 208, 200, 0.8);
+}
+
+.note p {
+  margin: 0;
+  color: var(--ink-light);
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.routeSummary {
+  color: var(--ink-light);
+  line-height: 1.6;
+}

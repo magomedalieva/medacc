@@ -1,0 +1,83 @@
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  box-shadow: var(--shadow-sm);
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.copy {
+  display: grid;
+  gap: 6px;
+}
+
+.title {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.caption {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.value {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--paper-dark);
+}
+
+.fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.accent {
+  color: var(--accent);
+}
+
+.green {
+  color: var(--green);
+}
+
+.warm {
+  color: var(--warm);
+}
+
+.default {
+  color: var(--ink-faint);
+}
+
+.accentFill {
+  background: var(--accent);
+}
+
+.greenFill {
+  background: var(--green);
+}
+
+.warmFill {
+  background: var(--warm);
+}
+
+.defaultFill {
+  background: var(--ink-15);
+}

@@ -1,0 +1,61 @@
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.models.base import Base
+
+if TYPE_CHECKING:
+    from app.models.exam_simulation import ExamSimulation
+    from app.models.plan_task import PlanTask
+    from app.models.topic import Topic
+    from app.models.user import User
+
+
+class ClinicalCaseExamSession(Base):
+    __tablename__ = "clinical_case_exam_sessions"
+    __table_args__ = (
+        Index(
+            "ix_clinical_case_exam_sessions_user_case_status",
+            "user_id",
+            "case_slug",
+            "status",
+        ),
+        Index(
+            "ix_clinical_case_exam_sessions_user_expires_at",
+            "user_id",
+            "expires_at",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    case_slug: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    topic_id: Mapped[int | None] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    planned_task_id: Mapped[int | None] = mapped_column(
+        ForeignKey("plan_tasks.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    simulation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("exam_simulations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    attempt_context: Mapped[str] = mapped_column(String(40), nullable=False, default="free_training")
+    mode: Mapped[str] = mapped_column(String(20), nullable=False, default="exam")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped[User] = relationship()
+    topic: Mapped[Topic | None] = relationship()
+    planned_task: Mapped[PlanTask | None] = relationship()
+    simulation: Mapped[ExamSimulation | None] = relationship()

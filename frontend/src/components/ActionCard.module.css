@@ -1,0 +1,32 @@
+.card {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  box-shadow: var(--shadow-sm);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 28px;
+  line-height: 1.02;
+  color: var(--ink);
+}
+
+.description {
+  margin: 0;
+  color: var(--ink-light);
+  line-height: 1.6;
+}
+
+.accent {
+  background: linear-gradient(180deg, rgba(245, 230, 233, 0.95) 0%, rgba(255, 253, 249, 1) 100%);
+  border-color: rgba(185, 28, 58, 0.2);
+}
+
+.default {
+  background: white;
+}

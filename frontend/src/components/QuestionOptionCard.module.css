@@ -1,0 +1,47 @@
+.card {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.card input {
+  margin: 3px 0 0;
+}
+
+.label {
+  min-width: 28px;
+  display: inline-flex;
+  justify-content: center;
+  padding-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.text {
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.selected {
+  border-color: rgba(26, 26, 26, 0.28);
+  box-shadow: var(--shadow-md);
+}
+
+.correct {
+  background: rgba(232, 244, 238, 0.88);
+  border-color: rgba(45, 106, 79, 0.3);
+}
+
+.incorrect {
+  background: rgba(245, 230, 233, 0.9);
+  border-color: rgba(185, 28, 58, 0.28);
+}

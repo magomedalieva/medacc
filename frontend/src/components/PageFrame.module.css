@@ -1,0 +1,21 @@
+.frame {
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  padding: 28px 24px 56px;
+}
+
+.compact {
+  width: min(100%, 1024px);
+}
+
+.default {
+  width: min(100%, 1280px);
+}
+
+@media (max-width: 720px) {
+  .frame {
+    padding-inline: 18px;
+    padding-top: 22px;
+    padding-bottom: 44px;
+  }
+}

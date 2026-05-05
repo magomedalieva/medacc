@@ -1,0 +1,7 @@
+.shell {
+  min-height: 100vh;
+}
+
+.main {
+  min-height: calc(100vh - 61px);
+}

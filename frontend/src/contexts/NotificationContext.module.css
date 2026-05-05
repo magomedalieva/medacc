@@ -1,0 +1,134 @@
+.toastShelf {
+  position: fixed;
+  top: 76px;
+  right: 24px;
+  z-index: 360;
+  display: grid;
+  width: min(400px, calc(100vw - 32px));
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast {
+  position: relative;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) 28px;
+  gap: 12px;
+  align-items: start;
+  padding: 16px 16px 16px 15px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow:
+    0 24px 56px -34px rgba(12, 12, 12, 0.48),
+    0 10px 28px -24px rgba(12, 12, 12, 0.32);
+  animation: toastIn 220ms var(--ease) both;
+  pointer-events: auto;
+}
+
+.toast::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  border-radius: 8px 0 0 8px;
+  background: var(--ink);
+}
+
+.toast.success::before {
+  background: var(--green);
+}
+
+.toast.danger::before {
+  background: var(--accent);
+}
+
+.toast.warm::before {
+  background: var(--gold);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--ink-40);
+}
+
+.success .dot {
+  background: var(--green);
+}
+
+.danger .dot {
+  background: var(--accent);
+}
+
+.warm .dot {
+  background: var(--gold);
+}
+
+.copy {
+  min-width: 0;
+}
+
+.title {
+  margin-bottom: 5px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.message {
+  color: var(--ink-70);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.close {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink-70);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 160ms var(--ease),
+    color 160ms var(--ease),
+    border-color 160ms var(--ease);
+}
+
+.close:hover,
+.close:focus-visible {
+  border-color: var(--ink-15);
+  background: var(--surface);
+  color: var(--ink);
+  outline: none;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 720px) {
+  .toastShelf {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+}

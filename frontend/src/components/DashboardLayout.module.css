@@ -1,0 +1,58 @@
+.page {
+  --db-ink: #0c0c0c;
+  --db-ink-70: rgba(12, 12, 12, 0.7);
+  --db-ink-40: rgba(12, 12, 12, 0.4);
+  --db-ink-15: rgba(12, 12, 12, 0.15);
+  --db-ink-07: rgba(12, 12, 12, 0.07);
+  --db-paper: #f5f3ee;
+  --db-surface: #ffffff;
+  --db-rule: rgba(12, 12, 12, 0.1);
+  --db-accent: #b91c3a;
+  --db-accent-lo: rgba(185, 28, 58, 0.07);
+  --db-accent-mid: rgba(185, 28, 58, 0.18);
+  --db-green: #1a5c3e;
+  --db-green-lo: rgba(26, 92, 62, 0.07);
+  --db-gold: #8a6d2e;
+  --db-gold-lo: rgba(138, 109, 46, 0.08);
+  --db-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --db-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  color: var(--db-ink);
+  background: var(--db-paper);
+  background-image:
+    radial-gradient(
+      ellipse 70% 45% at 2% 0%,
+      rgba(185, 28, 58, 0.045) 0%,
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 55% 55% at 98% 100%,
+      rgba(26, 92, 62, 0.05) 0%,
+      transparent 100%
+    );
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  width: min(100%, 1340px);
+  margin: 0 auto;
+  padding: 36px 36px 88px;
+  opacity: 0;
+  transform: translateY(14px);
+  animation: mount 550ms var(--db-ease) 60ms forwards;
+}
+
+@keyframes mount {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 680px) {
+  .shell {
+    padding: 22px 18px 60px;
+  }
+}

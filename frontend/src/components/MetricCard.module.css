@@ -1,0 +1,37 @@
+.card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  box-shadow: var(--shadow-sm);
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.value {
+  font-family: var(--font-serif);
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.accent .value {
+  color: var(--accent);
+}
+
+.green .value {
+  color: var(--green);
+}
+
+.warm .value {
+  color: var(--warm);
+}

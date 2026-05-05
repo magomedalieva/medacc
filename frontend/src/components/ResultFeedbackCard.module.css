@@ -1,0 +1,19 @@
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  box-shadow: var(--shadow-sm);
+}
+
+.muted {
+  background: rgba(250, 248, 245, 0.9);
+}
+
+.description {
+  margin: 0;
+  color: var(--ink-light);
+  line-height: 1.6;
+}
