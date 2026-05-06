@@ -885,7 +885,8 @@
   align-content: start;
   gap: 34px;
   padding: clamp(54px, 7vw, 76px) clamp(42px, 7vw, 72px) clamp(36px, 6vw, 56px);
-  background: #fff;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.98) 0%, rgba(250, 247, 241, 0.98) 100%);
   box-shadow: -28px 0 80px rgba(12, 12, 12, 0.18);
 }
 
