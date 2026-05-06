@@ -157,7 +157,14 @@
   font-weight: 800;
   letter-spacing: 0.09em;
   text-transform: uppercase;
+}
+
+.inlineAction {
   color: var(--db-accent);
+}
+
+.detailButton {
+  color: var(--db-ink);
 }
 
 .inlineAction svg,
