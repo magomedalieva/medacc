@@ -71,8 +71,11 @@
 }
 
 .readinessValue {
+  font-family: var(--font-serif);
   font-size: 30px;
-  line-height: 1;
+  font-weight: 400;
+  line-height: 0.92;
+  letter-spacing: 0;
   color: var(--db-accent);
 }
 

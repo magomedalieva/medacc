@@ -2,27 +2,13 @@ import { AnimatedCounter } from "./AnimatedCounter";
 import { DashboardTimeCard } from "./DashboardTimeCard";
 import styles from "./DashboardHeader.module.css";
 
-function buildDeadlineProgress(daysUntilAccreditation: number | null): number {
-  if (daysUntilAccreditation === null) {
-    return 0;
-  }
-
-  return Math.max(0, Math.min(100, (1 - daysUntilAccreditation / 365) * 100));
-}
-
 export function DashboardDeadlineCard({
   daysUntilAccreditation,
 }: {
   daysUntilAccreditation: number | null;
 }) {
-  const urgent = daysUntilAccreditation !== null && daysUntilAccreditation <= 30;
-  const progress = buildDeadlineProgress(daysUntilAccreditation);
-
   return (
-    <aside
-      className={`${styles.deadlineCard} ${urgent ? styles.deadlineCardUrgent : ""}`}
-      aria-label="Дни до аккредитации"
-    >
+    <aside className={styles.deadlineCard} aria-label="Дни до аккредитации">
       <div className={styles.deadlineLabel}>До аккредитации</div>
       <div className={styles.deadlineValue}>
         {daysUntilAccreditation !== null ? (
@@ -35,7 +21,7 @@ export function DashboardDeadlineCard({
         )}
       </div>
       <div className={styles.deadlineBar}>
-        <div className={styles.deadlineFill} style={{ width: `${progress}%` }} />
+        <div className={styles.deadlineFill} />
       </div>
     </aside>
   );

@@ -1,13 +1,7 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
-
 import styles from "./DashboardTimeCard.module.css";
 
 function minutesFromSeconds(seconds: number): number {
   return Math.max(0, Math.round(seconds / 60));
-}
-
-function formatMinutes(minutes: number): string {
-  return `${minutes} мин`;
 }
 
 function buildStatusLabel(isTodayStudyDay: boolean, remainingMinutes: number): string | null {
@@ -24,7 +18,6 @@ function buildStatusLabel(isTodayStudyDay: boolean, remainingMinutes: number): s
 
 export function DashboardTimeCard({
   dailyStudySeconds,
-  todayStudySeconds,
   remainingStudySeconds,
   currentTaskEstimatedMinutes,
   isTodayStudyDay,
@@ -35,40 +28,21 @@ export function DashboardTimeCard({
   currentTaskEstimatedMinutes: number | null;
   isTodayStudyDay: boolean;
 }) {
-  const [now, setNow] = useState(() => new Date());
   const dailyMinutes = minutesFromSeconds(dailyStudySeconds);
   const remainingMinutes = minutesFromSeconds(remainingStudySeconds);
   const statusLabel = buildStatusLabel(isTodayStudyDay, remainingMinutes);
-  const progress = dailyStudySeconds > 0
-    ? Math.max(0, Math.min(100, (todayStudySeconds / dailyStudySeconds) * 100))
-    : 0;
-  const clockProgress = progress > 0 ? progress : 8;
-  const hourAngle = ((now.getHours() % 12) + now.getMinutes() / 60) * 30;
-  const minuteAngle = now.getMinutes() * 6;
-  const clockStyle = useMemo(
-    () =>
-      ({
-        "--hour-angle": `${hourAngle}deg`,
-        "--minute-angle": `${minuteAngle}deg`,
-        "--study-progress": `${clockProgress}%`,
-      }) as CSSProperties,
-    [clockProgress, hourAngle, minuteAngle],
-  );
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
-
-    return () => window.clearInterval(timer);
-  }, []);
 
   return (
-    <aside className={styles.card} style={clockStyle}>
+    <aside className={styles.card}>
       <div className={styles.valueBlock}>
         <span className={styles.label}>
           <span className={styles.labelIcon} aria-hidden="true" />
           Сегодня
         </span>
-        <strong>{formatMinutes(remainingMinutes)}</strong>
+        <strong>
+          {remainingMinutes}
+          <span className={styles.timeUnit}> мин</span>
+        </strong>
         <div className={styles.accentLine} aria-hidden="true" />
         <div className={styles.foot}>
           <span>из {dailyMinutes} мин</span>
@@ -80,9 +54,13 @@ export function DashboardTimeCard({
       </div>
 
       <div className={styles.clock} aria-hidden="true">
-        <span className={`${styles.hand} ${styles.hourHand}`} />
-        <span className={`${styles.hand} ${styles.minuteHand}`} />
-        <span className={styles.pin} />
+        <svg className={styles.clockSvg} viewBox="0 0 36 36" focusable="false">
+          <circle className={styles.clockTrack} cx="18" cy="18" r="14.5" pathLength="100" />
+          <circle className={styles.clockArc} cx="18" cy="18" r="14.5" pathLength="100" />
+          <line className={styles.clockHand} x1="18" y1="18" x2="18" y2="12.6" />
+          <line className={styles.clockHand} x1="18" y1="18" x2="23.5" y2="18" />
+          <circle className={styles.clockPin} cx="18" cy="18" r="0.9" />
+        </svg>
       </div>
     </aside>
   );
