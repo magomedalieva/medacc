@@ -260,7 +260,12 @@ export function AuthPage() {
             }
           }}
         >
-          <aside aria-labelledby="auth-drawer-title" aria-modal="true" className={styles.drawerPanel} role="dialog">
+          <aside
+            aria-labelledby="auth-drawer-title"
+            aria-modal="true"
+            className={`${styles.drawerPanel} ${activeTab === "register" ? styles.drawerPanelRegister : ""}`.trim()}
+            role="dialog"
+          >
             <button
               aria-label="Закрыть"
               className={styles.closeButton}

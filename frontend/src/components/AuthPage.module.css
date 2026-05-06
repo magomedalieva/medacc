@@ -889,6 +889,12 @@
   box-shadow: -28px 0 80px rgba(12, 12, 12, 0.18);
 }
 
+.drawerPanelRegister {
+  gap: 24px;
+  padding-top: clamp(42px, 5.5vw, 58px);
+  padding-bottom: clamp(24px, 4vw, 40px);
+}
+
 .drawerHeader {
   display: flex;
   justify-content: center;
@@ -968,13 +974,19 @@
   line-height: 1.55;
 }
 
+.authFormRegister .formHint {
+  margin-top: -2px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .authForm {
   display: grid;
   gap: 30px;
 }
 
 .authFormRegister {
-  gap: 22px;
+  gap: 16px;
 }
 
 .authGrid {
@@ -983,9 +995,17 @@
   gap: 36px;
 }
 
+.authFormRegister .authGrid {
+  gap: 28px;
+}
+
 .authField {
   display: grid;
   gap: 12px;
+}
+
+.authFormRegister .authField {
+  gap: 8px;
 }
 
 .authLabel {
@@ -1013,6 +1033,12 @@
   color: #171411;
   font-size: 17px;
   line-height: 1.3;
+}
+
+.authFormRegister .authInput {
+  min-height: 32px;
+  padding-bottom: 7px;
+  font-size: 16px;
 }
 
 .authInput::placeholder {
@@ -1063,6 +1089,11 @@
   letter-spacing: 0.1em;
 }
 
+.authFormRegister button[type="submit"] {
+  min-height: 50px;
+  margin-top: 0;
+}
+
 .authForm button[type="submit"]:hover:not(:disabled) {
   background: var(--accent);
   border-color: var(--accent);
@@ -1074,6 +1105,10 @@
   gap: 4px;
   align-items: center;
   margin-top: -14px;
+}
+
+.authFormRegister .passwordMeter {
+  margin-top: -8px;
 }
 
 .passwordMeter span {
@@ -1098,6 +1133,11 @@
   margin-top: -8px;
 }
 
+.authFormRegister .authChecklist {
+  gap: 6px;
+  margin-top: -7px;
+}
+
 .authRule {
   min-height: 20px;
   padding: 0;
@@ -1108,6 +1148,11 @@
   font-size: 12px;
   line-height: 1.45;
   background: transparent;
+}
+
+.authFormRegister .authRule {
+  min-height: 18px;
+  font-size: 11px;
 }
 
 .authRule::before {
