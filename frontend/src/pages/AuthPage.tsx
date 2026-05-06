@@ -1,12 +1,9 @@
-import { startTransition, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { startTransition, useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "../components/Button";
 import styles from "../components/AuthPage.module.css";
 import { NoticeBanner } from "../components/NoticeBanner";
-import { SegmentedTabs } from "../components/SegmentedTabs";
-import { TextField } from "../components/TextField";
-import { Wrapper } from "../components/Wrapper";
 import { useAuth } from "../contexts/AuthContext";
 import { ApiError } from "../lib/api";
 
@@ -19,6 +16,7 @@ type LandingModule = {
   title: string;
   label: string;
   copy: string;
+  preview: string[];
 };
 
 const modules: LandingModule[] = [
@@ -28,34 +26,39 @@ const modules: LandingModule[] = [
     title: "Тесты",
     label: "Рабочий режим",
     copy: "Вопросы первичной аккредитации с вариантами, статусами, прогрессом и разбором ошибок.",
+    preview: ["Учебный режим", "Контрольная попытка", "Разбор ответа"],
   },
   {
     id: "cases",
     num: "02",
     title: "Кейсы",
     label: "Клинические задачи",
-    copy: "Исходные данные, красные флаги, диагноз, ключевые признаки и первичная тактика.",
+    copy: "Исходные данные, признаки, диагноз, подтверждение и тактика в одном учебном маршруте.",
+    preview: ["12 вопросов", "Подсказки", "Клиническое мышление"],
   },
   {
     id: "oske",
     num: "03",
     title: "ОСКЭ",
     label: "Станции и чек-листы",
-    copy: "Практические станции с ключевыми пунктами, чек-листом и оценкой уверенности.",
+    copy: "Практические станции с чек-листом действий, мини-тестом и итоговым баллом.",
+    preview: ["Чек-лист 70%", "Тест 30%", "Порог освоения"],
   },
   {
     id: "plan",
     num: "04",
     title: "План",
     label: "Учебный маршрут",
-    copy: "Планировщик показывает учебный день, задачи, ближайшие повторения и календарь нагрузки.",
+    copy: "Планировщик показывает задачи на сегодня, ближайшие повторы и нагрузку по дням.",
+    preview: ["Дата аккредитации", "Дни занятий", "Пересчёт после паузы"],
   },
   {
     id: "analytics",
     num: "05",
     title: "Аналитика",
     label: "Готовность и дефицит",
-    copy: "Дашборд показывает учебную готовность, карту дефицита и статус пробной аккредитации по этапам.",
+    copy: "Система отдельно считает готовность по тестам, кейсам и ОСКЭ.",
+    preview: ["Слабый этап", "Прогноз", "История попыток"],
   },
 ];
 
@@ -67,10 +70,11 @@ export function AuthPage() {
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [loginForm, setLoginForm] = useState({
-    email: "",
-    password: "",
-  });
+  const [rememberMe, setRememberMe] = useState(true);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showRegisterConfirm, setShowRegisterConfirm] = useState(false);
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [registerForm, setRegisterForm] = useState({
     first_name: "",
     last_name: "",
@@ -267,142 +271,204 @@ export function AuthPage() {
             </button>
 
             <div className={styles.drawerHeader}>
-              <div>
-                <div className={styles.drawerKicker}>Старт работы</div>
-                <h2 className={styles.drawerTitle} id="auth-drawer-title">
-                  {activeTab === "login" ? "Войти в MedAcc" : "Создать аккаунт"}
-                </h2>
-                <p className={styles.drawerSubtitle}>
-                  {activeTab === "login"
-                    ? "Откроем кабинет или продолжим настройку плана с того места, где ты остановился."
-                    : "После регистрации система предложит выбрать факультет и дату аккредитации."}
-                </p>
+              <h2 className={styles.srOnly} id="auth-drawer-title">
+                {activeTab === "login" ? "Вход" : "Регистрация"}
+              </h2>
+              <div className={styles.authTabs} role="tablist">
+                <button
+                  aria-selected={activeTab === "login"}
+                  className={activeTab === "login" ? styles.authTabActive : ""}
+                  onClick={() => setActiveTab("login")}
+                  role="tab"
+                  type="button"
+                >
+                  Вход
+                </button>
+                <button
+                  aria-selected={activeTab === "register"}
+                  className={activeTab === "register" ? styles.authTabActive : ""}
+                  onClick={() => setActiveTab("register")}
+                  role="tab"
+                  type="button"
+                >
+                  Регистрация
+                </button>
               </div>
-              <SegmentedTabs
-                items={[
-                  { label: "Вход", value: "login" },
-                  { label: "Регистрация", value: "register" },
-                ]}
-                onChange={setActiveTab}
-                value={activeTab}
-              />
             </div>
 
             {error ? <NoticeBanner message={error} tone="danger" /> : null}
 
             {activeTab === "login" ? (
-              <form onSubmit={handleLogin}>
-                <Wrapper gap={16}>
-                  <TextField
-                    autoComplete="email"
-                    label="Электронная почта"
-                    onChange={(event) => updateLoginField("email", event.target.value)}
-                    placeholder="student@example.com"
-                    type="email"
-                    value={loginForm.email}
+              <form className={styles.authForm} onSubmit={handleLogin}>
+                <AuthField
+                  autoComplete="email"
+                  label="Электронная почта"
+                  onChange={(value) => updateLoginField("email", value)}
+                  placeholder="student@example.com"
+                  type="email"
+                  value={loginForm.email}
+                />
+                <AuthField
+                  autoComplete="current-password"
+                  label="Пароль"
+                  onChange={(value) => updateLoginField("password", value)}
+                  placeholder="Минимум 8 символов"
+                  type={showLoginPassword ? "text" : "password"}
+                  value={loginForm.password}
+                  withVisibilityToggle
+                  visible={showLoginPassword}
+                  onToggleVisibility={() => setShowLoginPassword((current) => !current)}
+                />
+                <label className={styles.rememberRow}>
+                  <input
+                    checked={rememberMe}
+                    onChange={(event) => setRememberMe(event.target.checked)}
+                    type="checkbox"
                   />
-                  <TextField
-                    autoComplete="current-password"
-                    label="Пароль"
-                    onChange={(event) => updateLoginField("password", event.target.value)}
-                    placeholder="Минимум 8 символов"
-                    type="password"
-                    value={loginForm.password}
-                  />
-                  <Button disabled={pending || !loginReady} fullWidth type="submit" variant="primary" withArrow>
-                    {pending ? "Входим..." : "Войти"}
-                  </Button>
-                  <div className={styles.formHint}>После входа откроется кабинет студента.</div>
-                </Wrapper>
+                  <span>Запомнить меня</span>
+                </label>
+                <Button disabled={pending || !loginReady} fullWidth type="submit" variant="primary" withArrow>
+                  {pending ? "Входим..." : "Войти"}
+                </Button>
               </form>
             ) : (
-              <form onSubmit={handleRegister}>
-                <Wrapper gap={16}>
-                  <Wrapper direction="row" gap={16} wrap>
-                    <Wrapper fullWidth grow>
-                      <TextField
-                        label="Имя"
-                        onChange={(event) => updateRegisterField("first_name", event.target.value)}
-                        placeholder="Анна"
-                        value={registerForm.first_name}
-                      />
-                    </Wrapper>
-                    <Wrapper fullWidth grow>
-                      <TextField
-                        label="Фамилия"
-                        onChange={(event) => updateRegisterField("last_name", event.target.value)}
-                        placeholder="Петрова"
-                        value={registerForm.last_name}
-                      />
-                    </Wrapper>
-                  </Wrapper>
-                  <TextField
-                    autoComplete="email"
-                    label="Электронная почта"
-                    onChange={(event) => updateRegisterField("email", event.target.value)}
-                    placeholder="student@example.com"
-                    type="email"
-                    value={registerForm.email}
+              <form className={`${styles.authForm} ${styles.authFormRegister}`} onSubmit={handleRegister}>
+                <div className={styles.authGrid}>
+                  <AuthField
+                    label="Имя"
+                    onChange={(value) => updateRegisterField("first_name", value)}
+                    placeholder="Иван"
+                    value={registerForm.first_name}
                   />
-                  <Wrapper direction="row" gap={16} wrap>
-                    <Wrapper fullWidth grow>
-                      <TextField
-                        autoComplete="new-password"
-                        label="Пароль"
-                        onChange={(event) => updateRegisterField("password", event.target.value)}
-                        placeholder="Минимум 8 символов"
-                        type="password"
-                        value={registerForm.password}
-                      />
-                    </Wrapper>
-                    <Wrapper fullWidth grow>
-                      <TextField
-                        autoComplete="new-password"
-                        label="Повтор пароля"
-                        onChange={(event) => updateRegisterField("confirmPassword", event.target.value)}
-                        placeholder="Ещё раз пароль"
-                        type="password"
-                        value={registerForm.confirmPassword}
-                      />
-                    </Wrapper>
-                  </Wrapper>
-                  <div aria-live="polite" className={styles.authChecklist}>
-                    <div
-                      className={`${styles.authRule} ${
-                        registerForm.password.length === 0
-                          ? styles.authRuleIdle
-                          : registerPasswordHasMinLength
-                            ? styles.authRuleReady
-                            : styles.authRuleAlert
-                      }`.trim()}
-                    >
-                      Минимум 8 символов
-                    </div>
-                    <div
-                      className={`${styles.authRule} ${
-                        !registerConfirmationStarted
-                          ? styles.authRuleIdle
-                          : registerPasswordsMatch
-                            ? styles.authRuleReady
-                            : styles.authRuleAlert
-                      }`.trim()}
-                    >
-                      Подтверждение совпадает с паролем
-                    </div>
+                  <AuthField
+                    label="Фамилия"
+                    onChange={(value) => updateRegisterField("last_name", value)}
+                    placeholder="Петров"
+                    value={registerForm.last_name}
+                  />
+                </div>
+                <AuthField
+                  autoComplete="email"
+                  label="Электронная почта"
+                  onChange={(value) => updateRegisterField("email", value)}
+                  placeholder="ivan.petrov@example.com"
+                  type="email"
+                  value={registerForm.email}
+                />
+                <AuthField
+                  autoComplete="new-password"
+                  label="Пароль"
+                  onChange={(value) => updateRegisterField("password", value)}
+                  placeholder="Минимум 8 символов"
+                  type={showRegisterPassword ? "text" : "password"}
+                  value={registerForm.password}
+                  withVisibilityToggle
+                  visible={showRegisterPassword}
+                  onToggleVisibility={() => setShowRegisterPassword((current) => !current)}
+                />
+                <div className={styles.passwordMeter} aria-hidden="true">
+                  <span className={registerPasswordHasMinLength ? styles.meterOn : ""} />
+                  <span className={registerPasswordHasMinLength ? styles.meterOn : ""} />
+                  <span className={registerPasswordsMatch ? styles.meterOn : ""} />
+                  <em>{registerPasswordHasMinLength ? "Хороший" : "Слабый"}</em>
+                </div>
+                <div aria-live="polite" className={styles.authChecklist}>
+                  <div
+                    className={`${styles.authRule} ${
+                      registerForm.password.length === 0
+                        ? styles.authRuleIdle
+                        : registerPasswordHasMinLength
+                          ? styles.authRuleReady
+                          : styles.authRuleAlert
+                    }`.trim()}
+                  >
+                    Минимум 8 символов
                   </div>
+                </div>
+                <AuthField
+                  autoComplete="new-password"
+                  label="Повтор пароля"
+                  onChange={(value) => updateRegisterField("confirmPassword", value)}
+                  placeholder="Ещё раз пароль"
+                  type={showRegisterConfirm ? "text" : "password"}
+                  value={registerForm.confirmPassword}
+                  withVisibilityToggle
+                  visible={showRegisterConfirm}
+                  onToggleVisibility={() => setShowRegisterConfirm((current) => !current)}
+                />
+                <div aria-live="polite" className={styles.authChecklist}>
+                  <div
+                    className={`${styles.authRule} ${
+                      !registerConfirmationStarted
+                        ? styles.authRuleIdle
+                        : registerPasswordsMatch
+                          ? styles.authRuleReady
+                          : styles.authRuleAlert
+                    }`.trim()}
+                  >
+                    Подтверждение совпадает с паролем
+                  </div>
+                </div>
                   <Button disabled={pending || !registerReady} fullWidth type="submit" variant="primary" withArrow>
                     {pending ? "Создаём профиль..." : "Создать аккаунт"}
                   </Button>
                   <div className={styles.formHint}>
                     Сразу после регистрации откроется короткая настройка персонального плана.
                   </div>
-                </Wrapper>
               </form>
             )}
           </aside>
         </div>
       ) : null}
     </div>
+  );
+}
+
+function AuthField({
+  autoComplete,
+  label,
+  onChange,
+  onToggleVisibility,
+  placeholder,
+  type = "text",
+  value,
+  visible = false,
+  withVisibilityToggle = false,
+}: {
+  autoComplete?: string;
+  label: string;
+  onChange: (value: string) => void;
+  onToggleVisibility?: () => void;
+  placeholder?: string;
+  type?: string;
+  value: string;
+  visible?: boolean;
+  withVisibilityToggle?: boolean;
+}) {
+  return (
+    <label className={styles.authField}>
+      <span className={styles.authLabel}>{label}</span>
+      <span className={styles.authControlWrap}>
+        <input
+          autoComplete={autoComplete}
+          className={styles.authInput}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          type={type}
+          value={value}
+        />
+        {withVisibilityToggle ? (
+          <button
+            aria-label={visible ? "Скрыть пароль" : "Показать пароль"}
+            className={styles.visibilityButton}
+            onClick={onToggleVisibility}
+            type="button"
+          >
+            <EyeIcon />
+          </button>
+        ) : null}
+      </span>
+    </label>
   );
 }
 
@@ -414,281 +480,59 @@ function ModuleCards({ active, setActive }: { active: number; setActive: (index:
     <div className={styles.cardsArea} aria-label="Разделы платформы">
       <div className={styles.cardsDivider} />
       <div className={styles.cardsStack}>
-        <ActiveCard module={activeModule} />
-        {collapsedModules.map(({ module, index }) => (
-          <CollapsedCard key={module.id} module={module} index={index} onActivate={() => setActive(index)} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ActiveCard({ module }: { module: LandingModule }) {
-  return (
-    <article className={styles.activeCard}>
-      <span className={styles.cardAccentLine} />
-      <span className={styles.cardNumber}>{module.num}</span>
-      <span className={styles.cardIcon}>
-        <ModuleIcon id={module.id} />
-      </span>
-
-      <div className={styles.cardBody}>
-        <div className={styles.cardHead}>
-          <div>
-            <h3>{module.title}</h3>
-            <span />
-          </div>
-          <p>{module.label}</p>
-        </div>
-
-        <p className={styles.cardCopy}>{module.copy}</p>
-
-        <div className={styles.previewSlot}>
-          <ProductPreview id={module.id} />
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function CollapsedCard({
-  module,
-  index,
-  onActivate,
-}: {
-  module: LandingModule;
-  index: number;
-  onActivate: () => void;
-}) {
-  return (
-    <button className={styles.collapsedCard} onClick={onActivate} type="button" aria-label={`Открыть раздел ${module.title}`}>
-      <span className={styles.collapsedNumber}>{module.num}</span>
-      <span className={styles.collapsedIcon}>
-        <ModuleIcon id={module.id} />
-      </span>
-      <span className={styles.collapsedTitle}>
-        <span>{module.title}</span>
-      </span>
-      <span className={styles.collapsedGhost}>{index + 1}</span>
-      <span className={styles.collapsedArrow}>
-        <Arrow />
-      </span>
-    </button>
-  );
-}
-
-function ProductPreview({ id }: { id: ModuleId }) {
-  return (
-    <div className={styles.productPreview}>
-      {id === "tests" ? <TestsPreview /> : null}
-      {id === "cases" ? <CasesPreview /> : null}
-      {id === "oske" ? <OskePreview /> : null}
-      {id === "plan" ? <PlanPreview /> : null}
-      {id === "analytics" ? <AnalyticsPreview /> : null}
-    </div>
-  );
-}
-
-function PreviewFrame({
-  children,
-  className = "",
-  maxWidth = 320,
-}: {
-  children: ReactNode;
-  className?: string;
-  maxWidth?: number;
-}) {
-  return (
-    <div className={`${styles.previewFrame} ${className}`.trim()} style={{ maxWidth }}>
-      {children}
-    </div>
-  );
-}
-
-function TestsPreview() {
-  const answers = ["Отложить лечение", "Госпитализировать", "Плановая диагностика", "Антибиотик без показаний"];
-
-  return (
-    <PreviewFrame maxWidth={292}>
-      <div className={styles.testPreviewTop}>
-        <span>
-          <i />
-          Вопрос 1
-        </span>
-        <span>01 / 30</span>
-      </div>
-      <div className={styles.testPreviewBody}>
-        <p>Острый холецистит: боль, лихорадка, симптом Мерфи. Что выбрать?</p>
-        <div className={styles.answerList}>
-          {answers.map((answer, index) => (
-            <div className={`${styles.answerRow} ${index === 1 ? styles.answerRowActive : ""}`} key={answer}>
-              <span>{String.fromCharCode(65 + index)}</span>
-              {answer}
+        <article className={styles.activeCard}>
+          <span className={styles.cardAccentLine} />
+          <span className={styles.cardNumber}>{activeModule.num}</span>
+          <span className={styles.cardIcon}>
+            <ModuleIcon id={activeModule.id} />
+          </span>
+          <div className={styles.cardBody}>
+            <div className={styles.cardHead}>
+              <div>
+                <h3>{activeModule.title}</h3>
+                <span />
+              </div>
+              <p>{activeModule.label}</p>
             </div>
-          ))}
-        </div>
-      </div>
-    </PreviewFrame>
-  );
-}
-
-function CasesPreview() {
-  const items = [
-    ["Жалобы", "Боль в животе"],
-    ["Осмотр", "Похудание"],
-    ["Красный флаг", "Свищи"],
-    ["Диагноз", "Болезнь Крона"],
-    ["Признак", "Свищи и стриктуры"],
-    ["Тактика", "Подобрать терапию"],
-  ];
-
-  return (
-    <PreviewFrame className={styles.casesPreview}>
-      <div className={styles.previewStage}>Этап 1 из 14</div>
-      <h4>Исходные данные</h4>
-      <div className={styles.caseFactGrid}>
-        {items.map(([label, value]) => (
-          <div key={label}>
-            <span>{label}</span>
-            <strong>{value}</strong>
+            <p className={styles.cardCopy}>{activeModule.copy}</p>
+            <div className={styles.previewSlot}>
+              <div className={styles.previewFrame}>
+                <div className={styles.answerList}>
+                  {activeModule.preview.map((item, index) => (
+                    <div className={index === 0 ? `${styles.answerRow} ${styles.answerRowActive}` : styles.answerRow} key={item}>
+                      <span>{index + 1}</span>
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-        ))}
-      </div>
-      <p>
-        <b>Вводные:</b> пациент в приемном отделении, оценка симптомов и тактики.
-      </p>
-    </PreviewFrame>
-  );
-}
+        </article>
 
-function OskePreview() {
-  const steps = [
-    "Оценить безопасность",
-    "Проверить сознание",
-    "Позвать на помощь",
-    "Открыть дыхательные пути",
-    "Оценить дыхание",
-  ];
-
-  return (
-    <PreviewFrame>
-      <div className={styles.oskePreviewTop}>
-        <strong>Отмечено пунктов</strong>
-        <span>0 / 8</span>
-      </div>
-      <div className={styles.oskeList}>
-        {steps.map((step) => (
-          <div key={step}>
-            <span>
-              <i />
-              {step}
+        {collapsedModules.map(({ module, index }) => (
+          <button
+            className={styles.collapsedCard}
+            key={module.id}
+            onClick={() => setActive(index)}
+            type="button"
+            aria-label={`Открыть раздел ${module.title}`}
+          >
+            <span className={styles.collapsedNumber}>{module.num}</span>
+            <span className={styles.collapsedIcon}>
+              <ModuleIcon id={module.id} />
             </span>
-            <strong>Ключевой</strong>
-          </div>
+            <span className={styles.collapsedTitle}>
+              <span>{module.title}</span>
+            </span>
+            <span className={styles.collapsedGhost}>{index + 1}</span>
+            <span className={styles.collapsedArrow}>
+              <Arrow />
+            </span>
+          </button>
         ))}
       </div>
-    </PreviewFrame>
-  );
-}
-
-function PlanPreview() {
-  return (
-    <PreviewFrame className={styles.planPreview}>
-      <div className={styles.planHeader}>
-        <span>Пятница, 1 мая</span>
-        <span>Учебный день</span>
-        <span>Режим →</span>
-      </div>
-      <div className={styles.planGrid}>
-        <div>
-          <b>Сегодня</b>
-          <strong>10:00 Реанимация</strong>
-          <span>Завтра: Желтуха</span>
-        </div>
-        <div>
-          <h4>1 мая</h4>
-          {["ОСКЭ", "Неврология", "Повтор"].map((item) => (
-            <span key={item}>○ {item}</span>
-          ))}
-        </div>
-        <div>
-          <h4>Май</h4>
-          <div className={styles.calendarGrid}>
-            {Array.from({ length: 28 }).map((_, index) => (
-              <span className={index === 11 ? styles.calendarActive : ""} key={index}>
-                {index + 1}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    </PreviewFrame>
-  );
-}
-
-function AnalyticsPreview() {
-  const deficitRows = ["Покр", "Свеж", "Стаб", "Практ"];
-
-  return (
-    <PreviewFrame className={styles.analyticsPreview}>
-      <div className={styles.analyticsTabs}>
-        <span>Обзор</span>
-        <span>Тесты</span>
-        <span>Кейсы</span>
-        <span>ОСКЭ</span>
-      </div>
-      <div className={styles.analyticsGrid}>
-        <div>
-          <b>Учебная готовность</b>
-          <div className={styles.miniRing}>
-            <span>38%</span>
-          </div>
-          <p>
-            Тесты 45%
-            <br />
-            Кейсы 50%
-            <br />
-            ОСКЭ 25%
-          </p>
-        </div>
-        <div>
-          <b>Карта дефицита</b>
-          <div className={styles.deficitGrid}>
-            <span />
-            {["Т", "К", "О"].map((header) => (
-              <b key={header}>{header}</b>
-            ))}
-            {deficitRows
-              .map((row, rowIndex) => [
-                <span key={row}>{row}</span>,
-                ...[0, 1, 2].map((columnIndex) => (
-                  <span key={`${row}-${columnIndex}`}>
-                    <i
-                      className={
-                        rowIndex + columnIndex > 3
-                          ? styles.deficitCritical
-                          : rowIndex + columnIndex > 1
-                            ? styles.deficitRisk
-                            : styles.deficitNorm
-                      }
-                    />
-                  </span>
-                )),
-              ])
-              .flat()}
-          </div>
-        </div>
-        <div>
-          <b>Протокол</b>
-          {["Тестовый", "Задачи", "ОСКЭ"].map((item, index) => (
-            <p className={styles.protocolRow} key={item}>
-              <span>{item}</span>
-              <strong>{index === 2 ? "Сдан" : "Не сдан"}</strong>
-            </p>
-          ))}
-        </div>
-      </div>
-    </PreviewFrame>
+    </div>
   );
 }
 
@@ -759,6 +603,25 @@ function ModuleIcon({ id }: { id: ModuleId }) {
       <path d="M4 4v15" />
       <path d="M7 16l4-5 3 2 5-7" />
       <circle cx="19" cy="6" r="1.6" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="2.7" />
     </svg>
   );
 }

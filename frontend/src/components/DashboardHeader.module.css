@@ -67,10 +67,10 @@
 .statusRail {
   display: grid;
   grid-template-columns: minmax(96px, 0.82fr) minmax(176px, 1.18fr);
-  gap: 31px;
+  gap: 28px;
   align-items: start;
   justify-self: end;
-  width: min(100%, 416px);
+  width: min(100%, 430px);
   padding-top: 11px;
 }
 
@@ -81,8 +81,8 @@
 .deadlineLabel {
   font-family: var(--font-mono);
   font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--db-ink-40);
 }
@@ -90,7 +90,7 @@
 .deadlineValue {
   font-family: var(--font-serif);
   font-size: clamp(28px, 3vw, 36px);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 0.96;
   letter-spacing: 0;
   transition: color 300ms;
@@ -102,7 +102,7 @@
 
 .deadlineUnit {
   font-size: 0.55em;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .deadlineBar {

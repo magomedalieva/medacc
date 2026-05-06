@@ -15,41 +15,27 @@ export function DashboardDeadlineCard({
 }: {
   daysUntilAccreditation: number | null;
 }) {
-  const urgent =
-    daysUntilAccreditation !== null && daysUntilAccreditation <= 30;
+  const urgent = daysUntilAccreditation !== null && daysUntilAccreditation <= 30;
   const progress = buildDeadlineProgress(daysUntilAccreditation);
 
   return (
     <aside
-      className={`${styles.deadlineCard} ${
-        urgent ? styles.deadlineCardUrgent : ""
-      }`}
+      className={`${styles.deadlineCard} ${urgent ? styles.deadlineCardUrgent : ""}`}
       aria-label="Дни до аккредитации"
     >
       <div className={styles.deadlineLabel}>До аккредитации</div>
       <div className={styles.deadlineValue}>
-        {daysUntilAccreditation !== null && urgent ? (
-          <span className={styles.deadlineValueUrgent}>
+        {daysUntilAccreditation !== null ? (
+          <>
             <AnimatedCounter value={daysUntilAccreditation} />
             <span className={styles.deadlineUnit}> дн.</span>
-          </span>
-        ) : null}
-        {daysUntilAccreditation !== null ? (
-          urgent ? null : (
-            <>
-              <AnimatedCounter value={daysUntilAccreditation} />
-              <span className={styles.deadlineUnit}> дн.</span>
-            </>
-          )
+          </>
         ) : (
           "—"
         )}
       </div>
       <div className={styles.deadlineBar}>
-        <div
-          className={styles.deadlineFill}
-          style={{ width: `${progress}%` }}
-        />
+        <div className={styles.deadlineFill} style={{ width: `${progress}%` }} />
       </div>
     </aside>
   );
