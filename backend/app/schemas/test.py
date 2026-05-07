@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -14,6 +15,7 @@ class TestSessionCreateRequest(BaseModel):
     planned_task_id: int | None = Field(default=None, ge=1)
     simulation_id: UUID | None = None
     question_ids: list[int] | None = Field(default=None, min_length=1, max_length=80)
+    attempt_context: Literal["initial_diagnostic"] | None = None
 
 
 class TestSessionAnswerResultResponse(BaseModel):

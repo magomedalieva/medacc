@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { api, ApiError, isAbortError } from "../lib/api";
 import { buildAccreditationReturnRoute } from "../lib/session";
 import type {
+  ExamSimulation,
   OsceAttemptHistoryItem,
   OsceAttemptStartResponse,
   OsceAttemptSubmitResponse,
@@ -88,6 +89,8 @@ interface AttemptResult {
   cl: number;
   q: number;
   pts: number;
+  historical?: boolean;
+  checked: string[];
   cl_d: number;
   cl_t: number;
   q_ok: number;
@@ -105,6 +108,17 @@ interface OsceExamSimulationRun {
   index: number;
   results: OsceExamSimulationResult[];
   finished: boolean;
+}
+
+interface StrictOsceStageResult {
+  slug: string;
+  scorePercent: number | null;
+  passed: boolean | null;
+}
+
+interface StrictOsceStageProgress {
+  attemptedSlugs: Set<string>;
+  stationResults: Map<string, StrictOsceStageResult>;
 }
 
 function normalizeStationStatus(status: string): StationStatus {
@@ -142,6 +156,61 @@ function parseSlugList(value: string | null): string[] {
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .filter((item) => /^[a-z0-9][a-z0-9-]*$/.test(item));
+}
+
+function parseStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => (typeof item === "string" ? item.trim().toLowerCase() : ""))
+    .filter((item) => /^[a-z0-9][a-z0-9-]*$/.test(item));
+}
+
+function parsePercent(value: unknown): number | null {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return null;
+  }
+
+  return Math.max(0, Math.min(100, value));
+}
+
+function parseBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
+function getOsceStage(simulation: ExamSimulation | null | undefined) {
+  return simulation?.stages.find((stage) => stage.key === "osce") ?? null;
+}
+
+function extractStrictOsceProgress(simulation: ExamSimulation | null | undefined): StrictOsceStageProgress {
+  const stage = getOsceStage(simulation);
+  const details = stage?.details ?? {};
+  const attemptedSlugs = new Set(parseStringArray(details.attempted_station_slugs));
+  const stationResults = new Map<string, StrictOsceStageResult>();
+  const rawResults = Array.isArray(details.station_results) ? details.station_results : [];
+
+  rawResults.forEach((rawResult) => {
+    if (!rawResult || typeof rawResult !== "object") {
+      return;
+    }
+
+    const payload = rawResult as Record<string, unknown>;
+    const slug = typeof payload.slug === "string" ? payload.slug.trim().toLowerCase() : "";
+
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
+      return;
+    }
+
+    stationResults.set(slug, {
+      slug,
+      scorePercent: parsePercent(payload.score_percent),
+      passed: parseBoolean(payload.passed),
+    });
+  });
+
+  return { attemptedSlugs, stationResults };
 }
 
 function mapAttemptHistoryItem(attempt: OsceAttemptHistoryItem): AttemptItem {
@@ -236,6 +305,7 @@ function buildAttemptResult(
   response: OsceAttemptSubmitResponse,
   station: StationItem,
   selectedAnswers: Record<string, string>,
+  checkedItems: string[],
 ): AttemptResult {
   const questionTitleById = new Map(station.quiz.map((question) => [question.id, question.t]));
 
@@ -244,6 +314,7 @@ function buildAttemptResult(
     cl: response.checklist_score_percent,
     q: response.quiz_score_percent,
     pts: response.score_points,
+    checked: [...checkedItems],
     cl_d: response.checklist_completed_count,
     cl_t: response.checklist_total_count,
     q_ok: response.quiz_correct_answers,
@@ -256,6 +327,28 @@ function buildAttemptResult(
       yours: selectedAnswers[feedback.question_id] ?? "",
       expl: feedback.explanation,
     })),
+  };
+}
+
+function buildHistoricalAttemptResult(station: StationItem, stageResult: StrictOsceStageResult | null): AttemptResult {
+  const scorePercent = stageResult?.scorePercent ?? station.atts[0]?.total ?? 0;
+  const matchingAttempt =
+    station.atts.find((attempt) => Math.abs(attempt.total - scorePercent) < 0.5) ??
+    station.atts[0] ??
+    null;
+
+  return {
+    total: scorePercent,
+    cl: matchingAttempt?.cl ?? scorePercent,
+    q: matchingAttempt?.q ?? scorePercent,
+    pts: matchingAttempt?.pts ?? 0,
+    historical: true,
+    checked: [],
+    cl_d: matchingAttempt?.cl_d ?? 0,
+    cl_t: matchingAttempt?.cl_t ?? station.cl.length,
+    q_ok: matchingAttempt?.q_ok ?? 0,
+    q_t: matchingAttempt?.q_t ?? station.quiz.length,
+    fb: [],
   };
 }
 
@@ -470,6 +563,7 @@ export function OsceExperience() {
   const [osceExamRun, setOsceExamRun] = useState<OsceExamSimulationRun | null>(null);
   const [osceExamPreparing, setOsceExamPreparing] = useState(false);
   const [osceExamSummaryOpen, setOsceExamSummaryOpen] = useState(false);
+  const [osceExamReviewOpen, setOsceExamReviewOpen] = useState(false);
   const [stationGuideOpen, setStationGuideOpen] = useState(false);
   const [notice, setNotice] = useState<{ message: string; tone: NoticeTone } | null>(null);
   const [stationsLoading, setStationsLoading] = useState(true);
@@ -498,8 +592,18 @@ export function OsceExperience() {
     step !== "overview" && (isStationRoute || (stationOverlayOpen && osceExamRun !== null && !osceExamRun.finished));
 
   const currentStation = useMemo(
-    () => stations.find((stationItem) => stationItem.slug === activeStationSlug) ?? null,
-    [activeStationSlug, stations],
+    () => {
+      if (!activeStationSlug) {
+        return null;
+      }
+
+      return (
+        stations.find((stationItem) => stationItem.slug === activeStationSlug) ??
+        osceExamRun?.stations.find((stationItem) => stationItem.slug === activeStationSlug) ??
+        null
+      );
+    },
+    [activeStationSlug, osceExamRun?.stations, stations],
   );
   const stationActionLoading = stationDetailLoading || !currentStation;
 
@@ -725,12 +829,8 @@ export function OsceExperience() {
   }, [notice]);
 
   useEffect(() => {
-    if ((stationOverlayVisible && !stationPageMode) || successOpen || confirmOpen || osceExamSummaryOpen) {
-      document.body.style.overflow = "hidden";
-      return;
-    }
-
-    document.body.style.overflow = "";
+    const shouldLockScroll = (stationOverlayVisible && !stationPageMode) || successOpen || confirmOpen || osceExamSummaryOpen;
+    document.body.style.overflow = shouldLockScroll ? "hidden" : "";
 
     return () => {
       document.body.style.overflow = "";
@@ -898,6 +998,12 @@ export function OsceExperience() {
   }
 
   function openStationInPlace(station: StationItem) {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+
+    setStations((currentValue) => upsertStation(currentValue, station));
     setActiveStationSlug(station.slug);
     setChecked([]);
     setAnswers({});
@@ -927,6 +1033,20 @@ export function OsceExperience() {
     return detailedStation;
   }
 
+  async function loadStrictOsceStageProgress(): Promise<StrictOsceStageProgress> {
+    if (!token || !routedSimulationId) {
+      return {
+        attemptedSlugs: new Set(),
+        stationResults: new Map(),
+      };
+    }
+
+    const simulations = await api.listExamSimulations(token);
+    const simulation = simulations.find((item) => item.id === routedSimulationId) ?? null;
+
+    return extractStrictOsceProgress(simulation);
+  }
+
   async function startOsceExamSimulation(seedStationSlug?: string | null) {
     if (!token || osceExamPreparing || stationsLoading) {
       return;
@@ -947,6 +1067,12 @@ export function OsceExperience() {
     setOsceExamPreparing(true);
 
     try {
+      const strictStageProgress = isStrictOsceRun
+        ? await loadStrictOsceStageProgress()
+        : {
+            attemptedSlugs: new Set<string>(),
+            stationResults: new Map<string, StrictOsceStageResult>(),
+          };
       const assignedStations = routedStationSlugs
         .map((slug) => stations.find((station) => station.slug === slug) ?? null)
         .filter((station): station is StationItem => station !== null);
@@ -980,18 +1106,30 @@ export function OsceExperience() {
         return;
       }
 
+      const completedResults = simulationStations
+        .filter((station) => strictStageProgress.attemptedSlugs.has(station.slug))
+        .map((station) => ({
+          station,
+          result: buildHistoricalAttemptResult(station, strictStageProgress.stationResults.get(station.slug) ?? null),
+        }));
+      const nextStationIndex = simulationStations.findIndex((station) => !strictStageProgress.attemptedSlugs.has(station.slug));
+
       setOsceExamSummaryOpen(false);
+      setOsceExamReviewOpen(false);
       setOsceExamRun({
         stations: simulationStations,
-        index: 0,
-        results: [],
-        finished: false,
+        index: nextStationIndex === -1 ? simulationStations.length : nextStationIndex,
+        results: completedResults,
+        finished: nextStationIndex === -1,
       });
-      openStationInPlace(simulationStations[0]!);
-      setNotice({
-        message: "Пробная аккредитация: 5 станций подряд, каждая должна быть на 70% или выше.",
-        tone: "ok",
-      });
+
+      if (nextStationIndex === -1) {
+        setStationOverlayOpen(false);
+        setOsceExamSummaryOpen(true);
+        return;
+      }
+
+      openStationInPlace(simulationStations[nextStationIndex]!);
     } catch (error) {
       setNotice({
         message: error instanceof ApiError ? error.message : "Не удалось подготовить этап ОСКЭ",
@@ -1039,7 +1177,10 @@ export function OsceExperience() {
   }
 
   function tryClose() {
-    if (!submitted && (checked.length > 0 || Object.keys(answers).length > 0)) {
+    const learningStationInProgress = !isStrictOsceRun && !submitted && (step !== "overview" || activeOsceAttemptRef.current !== null);
+    const hasUnsavedProgress = !submitted && (checked.length > 0 || Object.keys(answers).length > 0);
+
+    if (learningStationInProgress || hasUnsavedProgress) {
       setConfirmOpen(true);
       return;
     }
@@ -1051,6 +1192,7 @@ export function OsceExperience() {
     setSuccessOpen(false);
     setConfirmOpen(false);
     setOsceExamRun(null);
+    setOsceExamReviewOpen(false);
     resetOsceAttempt();
 
     if (isStrictOsceRun) {
@@ -1118,7 +1260,7 @@ export function OsceExperience() {
         })),
         planned_task_id: routedPlannedTaskId,
       });
-      const result = buildAttemptResult(response, currentStation, answers);
+      const result = buildAttemptResult(response, currentStation, answers, checked);
       const nextAttempt = buildAttemptItemFromSubmitResponse(response);
 
       const feedbackById = new Map(
@@ -1172,6 +1314,7 @@ export function OsceExperience() {
         }
 
         setStationOverlayOpen(false);
+        setOsceExamReviewOpen(false);
         setOsceExamRun({
           ...osceExamRun,
           results: nextResults,
@@ -1200,6 +1343,7 @@ export function OsceExperience() {
 
   function closeOsceExamSummary() {
     setOsceExamSummaryOpen(false);
+    setOsceExamReviewOpen(false);
     setOsceExamRun(null);
 
     if (isStrictOsceRun) {
@@ -2004,7 +2148,7 @@ export function OsceExperience() {
           <div className={styles["modal-foot"]} id="modal-foot">
             {step === "overview" ? (
               <>
-                <button className={cx(styles.btn, styles["btn-o"], styles["footer-secondary"])} onClick={doClose} type="button">
+                <button className={cx(styles.btn, styles["btn-o"], styles["footer-secondary"])} onClick={tryClose} type="button">
                   Закрыть
                 </button>
                 <button
@@ -2168,68 +2312,181 @@ export function OsceExperience() {
         }}
         role="presentation"
       >
-        <div className={cx(styles.modal, styles["modal-sm"])}>
+        <div className={cx(styles.modal, styles["modal-sm"], osceExamReviewOpen && styles["stage-review-modal"])}>
           <div className={styles["modal-drag"]} />
-          <div className={styles["success-inner"]}>
-            <div className={styles["success-ring-wrap"]}>
-              <svg height="138" viewBox="0 0 138 138" width="138">
-                <circle cx="69" cy="69" fill="none" r="58" stroke="var(--rule)" strokeWidth="9" />
-                <circle
-                  cx="69"
-                  cy="69"
-                  fill="none"
-                  r="58"
-                  stroke={osceExamPassed ? "var(--green)" : "var(--accent)"}
-                  strokeDasharray={successRingCircumference}
-                  strokeDashoffset={successRingCircumference * (1 - osceExamAverage / 100)}
-                  strokeLinecap="round"
-                  strokeWidth="9"
-                  transform="rotate(-90 69 69)"
-                />
-              </svg>
-              <div className={styles["success-ring-inner"]}>
-                <div className={styles["success-big"]}>{osceExamAverage}%</div>
-                <div className={styles["success-sub-lbl"]}>Средний</div>
-              </div>
-            </div>
-
-            <div className={styles["success-title"]}>{osceExamPassed ? "Практический этап сдан" : "Практический этап не сдан"}</div>
-            <div className={styles["success-desc"]}>
-              Для зачёта каждая из 5 станций должна быть на 70% или выше.
-            </div>
-
-            <div className={styles["exam-result-list"]}>
-              {osceExamResults.map((item, index) => (
-                <div className={styles["exam-result-row"]} key={item.station.slug}>
-                  <div>
-                    <div className={styles["exam-result-title"]}>
-                      {index + 1}. {item.station.title}
-                    </div>
-                    <div className={styles["exam-result-meta"]}>
-                      Чек-лист {pct(item.result.cl)} · Тест {pct(item.result.q)}
-                    </div>
-                  </div>
-                  <div
-                    className={cx(
-                      styles["exam-result-score"],
-                      item.result.total >= ACCREDITATION_PASS_PERCENT ? styles.ok : styles.err,
-                    )}
-                  >
-                    {pct(item.result.total)}
+          <div className={cx(styles["success-inner"], osceExamReviewOpen && styles["stage-review-inner"])}>
+            {!osceExamReviewOpen ? (
+              <>
+                <div className={styles["success-ring-wrap"]}>
+                  <svg height="138" viewBox="0 0 138 138" width="138">
+                    <circle cx="69" cy="69" fill="none" r="58" stroke="var(--rule)" strokeWidth="9" />
+                    <circle
+                      cx="69"
+                      cy="69"
+                      fill="none"
+                      r="58"
+                      stroke={osceExamPassed ? "var(--green)" : "var(--accent)"}
+                      strokeDasharray={successRingCircumference}
+                      strokeDashoffset={successRingCircumference * (1 - osceExamAverage / 100)}
+                      strokeLinecap="round"
+                      strokeWidth="9"
+                      transform="rotate(-90 69 69)"
+                    />
+                  </svg>
+                  <div className={styles["success-ring-inner"]}>
+                    <div className={styles["success-big"]}>{osceExamAverage}%</div>
+                    <div className={styles["success-sub-lbl"]}>Средний</div>
                   </div>
                 </div>
-              ))}
-            </div>
 
-            <button
-              className={cx(styles.btn, styles["btn-p"], styles["btn-full"])}
-              onClick={() => {
-                closeOsceExamSummary();
-              }}
-              type="button"
-            >
-              {isStrictOsceRun ? "В аккредитацию" : "Закрыть"}
-            </button>
+                <div className={styles["success-title"]}>{osceExamPassed ? "Практический этап сдан" : "Практический этап не сдан"}</div>
+                <div className={styles["success-desc"]}>
+                  Для зачёта каждая из 5 станций должна быть на 70% или выше.
+                </div>
+
+                <div className={styles["exam-result-list"]}>
+                  {osceExamResults.map((item, index) => (
+                    <div className={styles["exam-result-row"]} key={item.station.slug}>
+                      <div>
+                        <div className={styles["exam-result-title"]}>
+                          {index + 1}. {item.station.title}
+                        </div>
+                        <div className={styles["exam-result-meta"]}>
+                          Чек-лист {pct(item.result.cl)} · Тест {pct(item.result.q)}
+                        </div>
+                      </div>
+                      <div
+                        className={cx(
+                          styles["exam-result-score"],
+                          item.result.total >= ACCREDITATION_PASS_PERCENT ? styles.ok : styles.err,
+                        )}
+                      >
+                        {pct(item.result.total)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  className={cx(styles.btn, styles["btn-p"], styles["btn-full"])}
+                  onClick={() => setOsceExamReviewOpen(true)}
+                  type="button"
+                >
+                  Посмотреть разбор
+                </button>
+                <button
+                  className={cx(styles.btn, styles["btn-o"], styles["btn-full"])}
+                  onClick={closeOsceExamSummary}
+                  type="button"
+                >
+                  {isStrictOsceRun ? "В аккредитацию" : "Закрыть"}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className={styles["stage-review-head"]}>
+                  <div>
+                    <div className={styles["success-sub-lbl"]}>Пробная аккредитация</div>
+                    <div className={styles["success-title"]}>Разбор практического этапа</div>
+                    <div className={styles["success-desc"]}>
+                      Средний результат {osceExamAverage}%. Для зачёта каждая станция должна быть на 70% или выше.
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles["stage-review-list"]}>
+                  {osceExamResults.map((item, index) => {
+                    const checkedItems = new Set(item.result.checked);
+
+                    return (
+                      <section className={styles["stage-review-group"]} key={item.station.slug}>
+                        <div className={styles["stage-review-row"]}>
+                          <div>
+                            <div className={styles["exam-result-meta"]}>Станция {index + 1}</div>
+                            <div className={styles["exam-result-title"]}>{item.station.title}</div>
+                            <div className={styles["exam-result-meta"]}>
+                              Чек-лист {pct(item.result.cl)} · Тест {pct(item.result.q)} · Баллы {item.result.pts}
+                            </div>
+                          </div>
+                          <div
+                            className={cx(
+                              styles["exam-result-score"],
+                              item.result.total >= ACCREDITATION_PASS_PERCENT ? styles.ok : styles.err,
+                            )}
+                          >
+                            {pct(item.result.total)}
+                          </div>
+                        </div>
+
+                        {item.result.historical ? (
+                          <div className={styles["stage-review-block"]}>
+                            <div className={styles.stitle}>Сохраненный итог</div>
+                            <div className={styles["exam-result-meta"]}>
+                              Станция уже завершена в этой пробной аккредитации. Здесь показан итоговый балл, чтобы этап можно было продолжить без повтора.
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                        <div className={styles["stage-review-block"]}>
+                          <div className={styles.stitle}>Чек-лист</div>
+                          {item.station.cl.map((checkItem) => {
+                            const completed = checkedItems.has(checkItem.id);
+
+                            return (
+                              <div
+                                className={cx(
+                                  styles["check-review-row"],
+                                  completed ? styles.ok : styles.err,
+                                  checkItem.crit && styles.critical,
+                                )}
+                                key={checkItem.id}
+                              >
+                                <span>{completed ? <CheckIcon /> : <XMarkIcon />}</span>
+                                <div>
+                                  <strong>{checkItem.t}</strong>
+                                  <p>{checkItem.d}</p>
+                                  {checkItem.crit ? <small>Критический пункт</small> : null}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className={styles["stage-review-block"]}>
+                          <div className={styles.stitle}>Тест станции</div>
+                          {item.result.fb.map((feedback) => (
+                            <div className={cx(styles["fb-item"], feedback.ok ? styles["fb-ok"] : styles["fb-err"])} key={feedback.id}>
+                              <div className={styles["fb-head"]}>
+                                <div className={styles["fb-hico"]}>{feedback.ok ? <CheckIcon /> : <XMarkIcon />}</div>
+                                <div className={styles["fb-htitle"]}>{feedback.t}</div>
+                                <span className={cx(styles.badge, styles["fb-badge"], feedback.ok ? styles["b-green"] : styles["b-accent"])}>
+                                  {feedback.ok ? "Верно" : `Верно: ${feedback.correct}`}
+                                </span>
+                              </div>
+                              <div className={styles["fb-body"]}>
+                                {!feedback.ok ? (
+                                  <div className={styles["fb-answer-line"]}>Ваш ответ: {feedback.yours || "Не выбран"}</div>
+                                ) : null}
+                                {feedback.expl}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                          </>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
+
+                <button className={cx(styles.btn, styles["btn-o"], styles["btn-full"])} onClick={() => setOsceExamReviewOpen(false)} type="button">
+                  К результату
+                </button>
+                <button className={cx(styles.btn, styles["btn-p"], styles["btn-full"])} onClick={closeOsceExamSummary} type="button">
+                  {isStrictOsceRun ? "В аккредитацию" : "Закрыть"}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -2253,14 +2510,14 @@ export function OsceExperience() {
                 <circle cx="13" cy="13" r="11" stroke="currentColor" strokeWidth="1.6" />
               </svg>
             </div>
-            <div className={styles["conf-title"]}>Закрыть станцию?</div>
-            <p className={styles["conf-desc"]}>Незавершённая попытка не сохранится. Прогресс чек-листа и ответы будут потеряны.</p>
+            <div className={styles["conf-title"]}>Завершить сейчас?</div>
+            <p className={styles["conf-desc"]}>Незавершённая станция не сохранится. Прогресс чек-листа и ответы будут потеряны.</p>
             <div className={styles["conf-acts"]}>
               <button className={cx(styles.btn, styles["btn-o"])} onClick={closeConfirm} style={{ flex: 1 }} type="button">
                 Продолжить
               </button>
               <button className={cx(styles.btn, styles["btn-danger"])} onClick={forceClose} style={{ flex: 1 }} type="button">
-                Закрыть
+                Да, завершить
               </button>
             </div>
           </div>

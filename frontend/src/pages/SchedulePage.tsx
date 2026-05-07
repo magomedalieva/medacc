@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../contexts/AuthContext";
 import { useNotifications, type NotificationTone } from "../contexts/NotificationContext";
+import { ScheduleRescheduleModal } from "../components/ScheduleRescheduleModal";
 import { api, ApiError, isAbortError } from "../lib/api";
 import { getLocalTodayIso, shiftIsoDate } from "../lib/date";
 import { formatDate, taskWorkloadLabel } from "../lib/format";
@@ -21,6 +22,7 @@ import {
   buildAccreditationTaskRoute,
   buildSessionPayloadFromTask,
   buildTaskKindLabel,
+  buildTaskSectionLabel,
   buildTaskTitle,
   isAccreditationTask,
   isCaseTask,
@@ -30,7 +32,7 @@ import {
 import type { PlanEventItem, PlanTask, ReadinessSummary, ScheduleResponse } from "../types/api";
 import styles from "./SchedulePage.module.css";
 
-type PendingAction = { action: "start" | "postpone" | "skip"; taskId: number } | null;
+type PendingAction = { action: "start" | "postpone" | "reschedule" | "skip"; taskId: number } | null;
 type CalendarLoad = "high" | "medium" | "low" | "pause";
 type IconProps = { className?: string };
 
@@ -206,6 +208,11 @@ function groupTasksByDate(tasks: PlanTask[]) {
   }, {});
 }
 
+function resolveScheduleFocusDate(schedule: ScheduleResponse) {
+  const firstActiveTask = [...schedule.tasks].filter(isTaskActive).sort(compareTasks)[0] ?? null;
+  return firstActiveTask?.scheduled_date ?? schedule.server_today;
+}
+
 function canStartTask(task: PlanTask, serverToday: string, studyWeekdays: number[], hasStudyTime: boolean) {
   return (
     hasStudyTime &&
@@ -232,7 +239,8 @@ function taskTone(task: PlanTask) {
 }
 
 function taskMeta(task: PlanTask) {
-  return `${taskWorkloadLabel(task)} · ${buildTaskKindLabel(task)}`;
+  const sectionLabel = buildTaskSectionLabel(task);
+  return [sectionLabel, taskWorkloadLabel(task), buildTaskKindLabel(task)].filter(Boolean).join(" · ");
 }
 
 function taskDuration(task: PlanTask) {
@@ -240,6 +248,10 @@ function taskDuration(task: PlanTask) {
 }
 
 function routeDateTitle(date: string, serverToday: string) {
+  if (date < serverToday) {
+    return `ПРОСРОЧЕНО, ${dayMonthLabel(date).toUpperCase()}`;
+  }
+
   if (date === serverToday) {
     return `СЕГОДНЯ, ${dayMonthLabel(date).toUpperCase()}`;
   }
@@ -395,9 +407,13 @@ export function SchedulePage() {
   const [savingPreferences, setSavingPreferences] = useState(false);
   const [planDetailsOpen, setPlanDetailsOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [rescheduleTask, setRescheduleTask] = useState<PlanTask | null>(null);
+  const [rescheduleTargetDate, setRescheduleTargetDate] = useState("");
+  const [skipConfirmTask, setSkipConfirmTask] = useState<PlanTask | null>(null);
 
   const requestIdRef = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const initialSelectionAppliedRef = useRef(false);
 
   const portalTarget = typeof document !== "undefined" ? document.body : null;
   const serverToday = schedule?.server_today ?? user?.server_today ?? getLocalTodayIso();
@@ -467,18 +483,10 @@ export function SchedulePage() {
   }, [activeStudyWeekdays, calendarMonth, selectedDate, serverToday, tasksByDate]);
 
   const routeDates = useMemo(() => {
-    const dates = Array.from(new Set(activeTasks.map((task) => task.scheduled_date)))
-      .filter((date) => date >= serverToday)
-      .sort((left, right) => left.localeCompare(right));
-
-    if (dates.length > 0) {
-      return dates.slice(0, 5);
-    }
-
     return Array.from(new Set(activeTasks.map((task) => task.scheduled_date)))
       .sort((left, right) => left.localeCompare(right))
       .slice(0, 5);
-  }, [activeTasks, serverToday]);
+  }, [activeTasks]);
 
   const recommendedTrack = readiness?.tracks.find((track) => track.key === readiness.recommended_focus_key) ?? null;
   const selectedTaskTrackKey = resolveTaskTrackKey(selectedPrimaryTask);
@@ -509,6 +517,37 @@ export function SchedulePage() {
     recommendedTrack?.detail ??
     readiness?.exam_protocol.summary ??
     "Планировщик держит впереди ближайшие незакрытые этапы и распределяет нагрузку по выбранному режиму.";
+  const rescheduleMinDate = findNextAllowedStudyDate(shiftIsoDate(serverToday, 1), activeStudyWeekdays, rescheduleMaxDate);
+  const rescheduleTargetAllowed = Boolean(
+    rescheduleTask &&
+      rescheduleMaxDate &&
+      rescheduleTargetDate &&
+      rescheduleTargetDate > serverToday &&
+      rescheduleTargetDate !== rescheduleTask.scheduled_date &&
+      (!rescheduleMaxDate || rescheduleTargetDate <= rescheduleMaxDate) &&
+      isStudyDateAllowed(rescheduleTargetDate, activeStudyWeekdays),
+  );
+  const firstAffectedTask =
+    rescheduleTask && rescheduleTargetDate
+      ? activeTasks
+          .filter((task) => task.id !== rescheduleTask.id && task.scheduled_date >= rescheduleTargetDate)
+          .sort(compareTasks)[0] ?? null
+      : null;
+  const rescheduleTargetDayTasks = rescheduleTargetDate
+    ? (tasksByDate[rescheduleTargetDate] ?? []).filter((task) => task.id !== rescheduleTask?.id && isTaskActive(task))
+    : [];
+  const rescheduleTargetDayMinutes = rescheduleTargetDayTasks.reduce((sum, task) => sum + task.estimated_minutes, 0);
+  const rescheduleTargetDaySummary =
+    rescheduleTargetDate.length === 0
+      ? "Выбери дату"
+      : !isStudyDateAllowed(rescheduleTargetDate, activeStudyWeekdays)
+        ? "Не учебный день"
+        : rescheduleTargetDayTasks.length === 0
+          ? "Свободный учебный день"
+          : `${rescheduleTargetDayTasks.length} задач · ≈ ${rescheduleTargetDayMinutes} мин уже в плане`;
+  const rescheduleAvailabilityNote = rescheduleTargetAllowed
+    ? "После подтверждения будущие задачи от этой даты будут пересчитаны."
+    : "Выбери будущий учебный день до даты аккредитации.";
 
   function beginRequest() {
     abortControllerRef.current?.abort();
@@ -551,17 +590,22 @@ export function SchedulePage() {
     });
   }
 
-  async function refreshSchedule(errorMessage: string) {
+  async function refreshSchedule(errorMessage: string, options: { selectFocus?: boolean } = {}) {
     if (!token) {
-      return;
+      return null;
     }
 
     try {
       const nextSchedule = await api.getSchedule(token);
       setSchedule(nextSchedule);
+      if (options.selectFocus) {
+        selectDate(resolveScheduleFocusDate(nextSchedule));
+      }
       setError(null);
+      return nextSchedule;
     } catch (exception) {
       setError(exception instanceof ApiError ? exception.message : errorMessage);
+      return null;
     }
   }
 
@@ -632,7 +676,43 @@ export function SchedulePage() {
     try {
       await api.postponeTask(token, task.id);
       pushToast("Задача перенесена, маршрут пересобран.", "warm");
-      await refreshSchedule("Задача перенесена, но план не удалось обновить");
+      await refreshSchedule("Задача перенесена, но план не удалось обновить", { selectFocus: true });
+    } catch (exception) {
+      setError(exception instanceof ApiError ? exception.message : "Не удалось перенести задачу");
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  function openRescheduleModal(task: PlanTask) {
+    const afterDate = task.scheduled_date > serverToday ? task.scheduled_date : serverToday;
+    const defaultTargetDate =
+      findNextAllowedStudyDate(shiftIsoDate(afterDate, 1), activeStudyWeekdays, rescheduleMaxDate) ??
+      rescheduleMinDate ??
+      "";
+
+    setRescheduleTask(task);
+    setRescheduleTargetDate(defaultTargetDate);
+  }
+
+  async function handleReschedule() {
+    if (!token || !rescheduleTask || !rescheduleTargetAllowed) {
+      return;
+    }
+
+    const taskId = rescheduleTask.id;
+    const targetDate = rescheduleTargetDate;
+
+    setPendingAction({ action: "reschedule", taskId });
+    setError(null);
+
+    try {
+      const nextSchedule = await api.rescheduleTask(token, taskId, { target_date: targetDate });
+      setSchedule(nextSchedule);
+      selectDate(targetDate);
+      setRescheduleTask(null);
+      setRescheduleTargetDate("");
+      pushToast("Задача перенесена, маршрут пересобран.", "warm");
     } catch (exception) {
       setError(exception instanceof ApiError ? exception.message : "Не удалось перенести задачу");
     } finally {
@@ -650,8 +730,9 @@ export function SchedulePage() {
 
     try {
       await api.skipTask(token, task.id);
+      setSkipConfirmTask(null);
       pushToast("Задача пропущена, будущие дни обновлены.", "warm");
-      await refreshSchedule("Задача пропущена, но план не удалось обновить");
+      await refreshSchedule("Задача пропущена, но план не удалось обновить", { selectFocus: true });
     } catch (exception) {
       setError(exception instanceof ApiError ? exception.message : "Не удалось пропустить задачу");
     } finally {
@@ -684,6 +765,7 @@ export function SchedulePage() {
 
       replaceUser(response.user);
       setSchedule(response.schedule);
+      selectDate(resolveScheduleFocusDate(response.schedule));
       setPreferencesModalOpen(false);
       pushToast("Режим сохранён.", "success");
     } catch (exception) {
@@ -708,6 +790,7 @@ export function SchedulePage() {
       return;
     }
 
+    initialSelectionAppliedRef.current = false;
     const { controller, requestId } = beginRequest();
 
     setLoading(true);
@@ -721,8 +804,10 @@ export function SchedulePage() {
 
         if (scheduleResult.status === "fulfilled") {
           setSchedule(scheduleResult.value);
-          setSelectedDate((current) => current || scheduleResult.value.server_today);
-          setCalendarMonth((current) => current || startOfMonth(parseIsoDate(scheduleResult.value.server_today)));
+          if (!initialSelectionAppliedRef.current) {
+            selectDate(resolveScheduleFocusDate(scheduleResult.value));
+            initialSelectionAppliedRef.current = true;
+          }
         } else if (!isAbortError(scheduleResult.reason)) {
           setError(scheduleResult.reason instanceof ApiError ? scheduleResult.reason.message : "Не удалось загрузить план");
         }
@@ -756,7 +841,9 @@ export function SchedulePage() {
   }, []);
 
   useEffect(() => {
-    if ((!preferencesModalOpen && !historyModalOpen) || typeof document === "undefined" || typeof window === "undefined") {
+    const hasModalOpen = preferencesModalOpen || historyModalOpen || Boolean(rescheduleTask) || Boolean(skipConfirmTask);
+
+    if (!hasModalOpen || typeof document === "undefined" || typeof window === "undefined") {
       return;
     }
 
@@ -776,7 +863,19 @@ export function SchedulePage() {
         return;
       }
 
-      if (historyModalOpen) {
+      if (rescheduleTask && pendingAction?.action === "reschedule") {
+        return;
+      }
+
+      if (skipConfirmTask && pendingAction?.action === "skip") {
+        return;
+      }
+
+      if (skipConfirmTask) {
+        setSkipConfirmTask(null);
+      } else if (rescheduleTask) {
+        setRescheduleTask(null);
+      } else if (historyModalOpen) {
         setHistoryModalOpen(false);
       } else {
         setPreferencesModalOpen(false);
@@ -790,7 +889,7 @@ export function SchedulePage() {
       body.style.paddingRight = previousPaddingRight;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [historyModalOpen, preferencesModalOpen]);
+  }, [historyModalOpen, pendingAction, preferencesModalOpen, rescheduleTask, skipConfirmTask]);
 
   return (
     <div className={styles.shell} data-testid="schedule-page">
@@ -863,7 +962,8 @@ export function SchedulePage() {
             ) : routeDates.length > 0 ? (
               routeDates.map((date, index) => {
                 const tomorrow = shiftIsoDate(serverToday, 1);
-                const isPrimaryDate = date === serverToday || date === tomorrow;
+                const isOverdueDate = date < serverToday;
+                const isPrimaryDate = isOverdueDate || date === serverToday || date === tomorrow;
                 const firstUpcomingIndex = routeDates.findIndex((routeDate) => routeDate > tomorrow);
                 const dateLabel = isPrimaryDate
                   ? routeDateTitle(date, serverToday)
@@ -873,44 +973,64 @@ export function SchedulePage() {
 
                 return (
                   <div className={styles["route-block"]} key={date}>
-                    <div className={cx(styles["route-date-label"], date === serverToday && styles.today)}>{dateLabel}</div>
+                    <div
+                      className={cx(
+                        styles["route-date-label"],
+                        date === serverToday && styles.today,
+                        isOverdueDate && styles.overdue,
+                      )}
+                    >
+                      {dateLabel}
+                    </div>
                     {(tasksByDate[date] ?? [])
                       .filter(isTaskActive)
                       .slice(0, isPrimaryDate ? 1 : 2)
-                      .map((task) => (
-                        <div
-                          className={styles["route-task"]}
-                          key={task.id}
-                          onClick={() => selectDate(task.scheduled_date)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              selectDate(task.scheduled_date);
-                            }
-                          }}
-                          role="button"
-                          tabIndex={0}
-                        >
-                          <span className={styles["route-time"]}>
-                            <strong>{isPrimaryDate ? "10:00" : shortDateLabel(date)}</strong>
-                          </span>
-                          <span className={styles["route-copy"]}>
-                            <strong>{buildTaskTitle(task)}</strong>
-                            <small>{taskMeta(task)}</small>
-                          </span>
-                          <button
-                            className={styles["route-open"]}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void handleStart(task);
+                      .map((task) => {
+                        const canOpenTask = canStartTask(task, serverToday, activeStudyWeekdays, todayHasStudyTime);
+
+                        return (
+                          <div
+                            className={styles["route-task"]}
+                            key={task.id}
+                            onClick={() => selectDate(task.scheduled_date)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                selectDate(task.scheduled_date);
+                              }
                             }}
-                            type="button"
+                            role="button"
+                            tabIndex={0}
                           >
-                            {pendingAction?.action === "start" && pendingAction.taskId === task.id ? "..." : "Открыть"}
-                            <ArrowRightIcon />
-                          </button>
-                        </div>
-                      ))}
+                            <span className={styles["route-time"]}>
+                              <strong>{isPrimaryDate ? "10:00" : shortDateLabel(date)}</strong>
+                            </span>
+                            <span className={styles["route-copy"]}>
+                              <strong>{buildTaskTitle(task)}</strong>
+                              <small>{taskMeta(task)}</small>
+                            </span>
+                            <button
+                              className={styles["route-open"]}
+                              disabled={!canOpenTask || pendingAction?.taskId === task.id}
+                              onClick={(event) => {
+                                event.stopPropagation();
+
+                                if (canOpenTask) {
+                                  void handleStart(task);
+                                }
+                              }}
+                              type="button"
+                            >
+                              {pendingAction?.action === "start" && pendingAction.taskId === task.id
+                                ? "..."
+                                : canOpenTask
+                                  ? "Открыть"
+                                  : "Позже"}
+                              <ArrowRightIcon />
+                            </button>
+                          </div>
+                        );
+                      })}
                   </div>
                 );
               })
@@ -954,31 +1074,35 @@ export function SchedulePage() {
 
             <div className={styles.timeline}>
               {selectedTasks.length > 0 ? (
-                selectedTasks.map((task, index) => (
-                  <button
-                    aria-label={`Открыть ${buildTaskTitle(task)}`}
-                    className={cx(
-                      styles["timeline-row"],
-                      styles[`tone-${taskTone(task)}`],
-                      !isTaskActive(task) && styles.muted,
-                    )}
-                    data-testid={`schedule-task-${task.id}`}
-                    disabled={!isTaskActive(task)}
-                    key={task.id}
-                    onClick={() => void handleStart(task)}
-                    type="button"
-                  >
-                    <span className={styles["timeline-node"]}>{index === 0 && isTaskActive(task) ? "" : ""}</span>
-                    <span className={styles["timeline-copy"]}>
-                      <strong title={buildTaskTitle(task)}>{buildTaskTitle(task)}</strong>
-                      <small>{taskMeta(task)}</small>
-                    </span>
-                    <span className={styles["timeline-min"]}>{taskDuration(task)}</span>
-                    <span className={styles["timeline-chevron"]}>
-                      <ChevronRightIcon />
-                    </span>
-                  </button>
-                ))
+                selectedTasks.map((task, index) => {
+                  const canOpenTask = canStartTask(task, serverToday, activeStudyWeekdays, todayHasStudyTime);
+
+                  return (
+                    <button
+                      aria-label={`Открыть ${buildTaskTitle(task)}`}
+                      className={cx(
+                        styles["timeline-row"],
+                        styles[`tone-${taskTone(task)}`],
+                        !canOpenTask && styles.muted,
+                      )}
+                      data-testid={`schedule-task-${task.id}`}
+                      disabled={!canOpenTask}
+                      key={task.id}
+                      onClick={() => void handleStart(task)}
+                      type="button"
+                    >
+                      <span className={styles["timeline-node"]}>{index === 0 && canOpenTask ? "" : ""}</span>
+                      <span className={styles["timeline-copy"]}>
+                        <strong title={buildTaskTitle(task)}>{buildTaskTitle(task)}</strong>
+                        <small>{taskMeta(task)}</small>
+                      </span>
+                      <span className={styles["timeline-min"]}>{taskDuration(task)}</span>
+                      <span className={styles["timeline-chevron"]}>
+                        <ChevronRightIcon />
+                      </span>
+                    </button>
+                  );
+                })
               ) : (
                 <div className={styles["day-empty"]}>
                   <strong>{selectedIsStudyDay ? "На эту дату задач нет" : "В этот день пауза"}</strong>
@@ -1011,7 +1135,7 @@ export function SchedulePage() {
                   : actionUnavailableLabel(selectedPrimaryTask, serverToday, todayIsStudyDay, todayHasStudyTime)}
               </button>
               <button
-                className={styles.secondary}
+                className={`${styles.secondary} ${styles["matched-action"]}`.trim()}
                 disabled={!selectedPrimaryTask || pendingAction?.taskId === selectedPrimaryTask.id}
                 onClick={() => selectedPrimaryTask && void handlePostpone(selectedPrimaryTask)}
                 type="button"
@@ -1024,9 +1148,27 @@ export function SchedulePage() {
                   : "На след. учебный"}
               </button>
               <button
-                className={styles.ghost}
+                className={styles.secondary}
+                disabled={
+                  !selectedPrimaryTask ||
+                  !rescheduleMinDate ||
+                  !rescheduleMaxDate ||
+                  pendingAction?.taskId === selectedPrimaryTask.id
+                }
+                onClick={() => selectedPrimaryTask && openRescheduleModal(selectedPrimaryTask)}
+                type="button"
+              >
+                <span className={styles["action-icon"]}>
+                  <CalendarIcon />
+                </span>
+                {pendingAction?.action === "reschedule" && pendingAction.taskId === selectedPrimaryTask?.id
+                  ? "Переносим..."
+                  : "Перенести"}
+              </button>
+              <button
+                className={`${styles.ghost} ${styles["matched-action"]}`.trim()}
                 disabled={!selectedPrimaryTask || pendingAction?.taskId === selectedPrimaryTask.id}
-                onClick={() => selectedPrimaryTask && void handleSkip(selectedPrimaryTask)}
+                onClick={() => selectedPrimaryTask && setSkipConfirmTask(selectedPrimaryTask)}
                 type="button"
               >
                 <span className={styles["action-icon"]}>
@@ -1272,6 +1414,78 @@ export function SchedulePage() {
                   </button>
                 </div>
               </div>
+            </div>,
+            portalTarget,
+          )
+        : null}
+
+      {portalTarget && rescheduleTask
+        ? createPortal(
+            <ScheduleRescheduleModal
+              availabilityNote={rescheduleAvailabilityNote}
+              canConfirm={rescheduleTargetAllowed}
+              currentDateLabel={fullDateLabel(rescheduleTask.scheduled_date)}
+              firstAffectedTaskDateLabel={firstAffectedTask ? fullDateLabel(firstAffectedTask.scheduled_date) : null}
+              firstAffectedTaskTitle={firstAffectedTask ? buildTaskTitle(firstAffectedTask) : null}
+              isSubmitting={pendingAction?.action === "reschedule" && pendingAction.taskId === rescheduleTask.id}
+              maxDate={rescheduleMaxDate}
+              minDate={rescheduleMinDate ?? shiftIsoDate(serverToday, 1)}
+              onClose={() => {
+                setRescheduleTask(null);
+                setRescheduleTargetDate("");
+              }}
+              onConfirm={() => void handleReschedule()}
+              onDateChange={setRescheduleTargetDate}
+              targetDate={rescheduleTargetDate}
+              targetDateLabel={rescheduleTargetDate ? fullDateLabel(rescheduleTargetDate) : "Дата не выбрана"}
+              targetDaySummary={rescheduleTargetDaySummary}
+              taskTitle={buildTaskTitle(rescheduleTask)}
+            />,
+            portalTarget,
+          )
+        : null}
+
+      {portalTarget && skipConfirmTask
+        ? createPortal(
+            <div
+              className={styles["prefs-overlay"]}
+              onClick={(event) => {
+                if (event.target === event.currentTarget && pendingAction?.action !== "skip") {
+                  setSkipConfirmTask(null);
+                }
+              }}
+            >
+              <section
+                aria-labelledby="schedule-skip-title"
+                aria-modal="true"
+                className={styles["confirm-popover"]}
+                role="dialog"
+              >
+                <div className={styles["confirm-kicker"]}>Планировщик</div>
+                <h2 id="schedule-skip-title">Пропустить задачу?</h2>
+                <p>
+                  {buildTaskTitle(skipConfirmTask)} будет отмечена как пропущенная, а ближайшие дни плана пересчитаются.
+                </p>
+                <div className={styles["confirm-actions"]}>
+                  <button
+                    disabled={pendingAction?.action === "skip"}
+                    onClick={() => setSkipConfirmTask(null)}
+                    type="button"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    className={styles.danger}
+                    disabled={pendingAction?.action === "skip"}
+                    onClick={() => void handleSkip(skipConfirmTask)}
+                    type="button"
+                  >
+                    {pendingAction?.action === "skip" && pendingAction.taskId === skipConfirmTask.id
+                      ? "Пропускаем..."
+                      : "Пропустить"}
+                  </button>
+                </div>
+              </section>
             </div>,
             portalTarget,
           )

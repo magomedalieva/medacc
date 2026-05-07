@@ -41,6 +41,15 @@ type ClinicalCaseListItem = {
   slug: string;
 };
 
+type OsceStationDetailApi = {
+  checklist_items: Array<{ id: string }>;
+  quiz_questions: Array<{ id: string; options: Array<{ label: string }> }>;
+};
+
+type OsceAttemptStartApi = {
+  attempt_id: string;
+};
+
 type TestSessionApi = {
   id: string;
   simulation_id: string | null;
@@ -166,6 +175,28 @@ test.describe("student smoke journeys", () => {
     expect(JSON.stringify(caseStage.details)).not.toContain("correct_option_label");
     expect(JSON.stringify(osceStage.details)).not.toContain("correct_option_label");
 
+    const firstStationResponse = await api.get(`${API_PREFIX}/osce/stations/${assignedStationSlugs[0]}`);
+    expect(firstStationResponse.ok()).toBeTruthy();
+    const firstStation = (await firstStationResponse.json()) as OsceStationDetailApi;
+    const firstStationStartResponse = await api.post(`${API_PREFIX}/osce/stations/${assignedStationSlugs[0]}/attempts/start`, {
+      data: {
+        simulation_id: activeSimulation!.id,
+      },
+    });
+    expect(firstStationStartResponse.status()).toBe(201);
+    const firstStationStart = (await firstStationStartResponse.json()) as OsceAttemptStartApi;
+    const firstStationSubmitResponse = await api.post(`${API_PREFIX}/osce/stations/${assignedStationSlugs[0]}/attempts`, {
+      data: {
+        attempt_id: firstStationStart.attempt_id,
+        checklist_item_ids: firstStation.checklist_items.map((item) => item.id),
+        quiz_answers: firstStation.quiz_questions.map((question) => ({
+          question_id: question.id,
+          selected_option_label: question.options[0]?.label ?? "A",
+        })),
+      },
+    });
+    expect(firstStationSubmitResponse.status()).toBe(201);
+
     await page.getByTestId("accreditation-stage-cases-start").click();
     await expect(page).toHaveURL(/\/app\/accreditation\/cases/);
     const casesUrl = new URL(page.url());
@@ -199,6 +230,11 @@ test.describe("student smoke journeys", () => {
     expect(osceUrl.searchParams.get("simulationId")).toBe(activeSimulation!.id);
     expect(osceUrl.searchParams.get("stationSlugs")?.split(",")).toEqual(assignedStationSlugs);
     await expect(page.getByTestId("osce-station-modal")).toBeVisible();
+    await expect(page.getByTestId("osce-station-modal")).toContainText("2 из 5");
+    await expect(page.getByTestId("osce-start-checklist")).toBeEnabled();
+    await page.getByTestId("osce-start-checklist").click();
+    await expect(page.getByTestId("osce-station-page")).toBeVisible();
+    await expect(page.getByTestId("osce-open-quiz")).toBeVisible();
 
     await api.dispose();
   });

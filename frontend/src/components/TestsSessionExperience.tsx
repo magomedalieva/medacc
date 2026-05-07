@@ -647,8 +647,9 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
   const examMode = session.mode === "exam";
   const activeAttemptContext = finishResult?.attempt_context ?? session.attempt_context;
   const activeSimulationId = finishResult?.simulation_id ?? session.simulation_id;
+  const initialDiagnosticMode = activeAttemptContext === "initial_diagnostic";
   const strictAccreditationMode = activeAttemptContext === "strict_simulation" || Boolean(activeSimulationId);
-  const controlExamMode = examMode && !strictAccreditationMode;
+  const controlExamMode = examMode && !strictAccreditationMode && !initialDiagnosticMode;
   const completedCount = Math.min(Object.keys(answers).length, session.total_questions);
   const progressPercent = Math.round((completedCount / session.total_questions) * 100);
   const correctCount = examMode ? 0 : Object.values(answers).filter((answer) => answer.response.is_correct === true).length;
@@ -687,7 +688,9 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
   const resultMinutes = Math.floor(elapsedSeconds / 60);
   const resultSeconds = elapsedSeconds % 60;
   const sessionKicker = examMode
-    ? strictAccreditationMode
+    ? initialDiagnosticMode
+      ? "Стартовая диагностика"
+      : strictAccreditationMode
       ? "Этап пробной аккредитации"
       : "Контрольная сессия"
     : "Учебная сессия";
@@ -696,21 +699,29 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
       ? "Контроль по теме"
       : "Тематический тест"
     : examMode
-      ? strictAccreditationMode
+      ? initialDiagnosticMode
+        ? "Стартовая диагностика"
+        : strictAccreditationMode
         ? "Пробная аккредитация"
         : "Контроль без подсказок"
       : "Смешанный тест";
   const sessionSubtitle = examMode
-    ? strictAccreditationMode
+    ? initialDiagnosticMode
+      ? "Входной срез без подсказок. После финиша система составит план по слабым темам."
+      : strictAccreditationMode
       ? "Строгий режим пробной аккредитации. Разбор доступен после финиша."
       : "Учебный контроль без подсказок. Разбор доступен после финиша."
     : "После каждого ответа система покажет правильный вариант и пояснение.";
   const sessionModeLabel = examMode
-    ? strictAccreditationMode
+    ? initialDiagnosticMode
+      ? "Стартовая диагностика"
+      : strictAccreditationMode
       ? "Пробная аккредитация"
       : "Контроль без подсказок"
     : "Учебный режим";
-  const resultSubtitle = resultPassed
+  const resultSubtitle = initialDiagnosticMode
+    ? "Диагностика завершена. Мы составили для вас план подготовки по слабым темам, начните с разбора ошибок."
+    : resultPassed
     ? strictAccreditationMode
       ? "Этап учтен в протоколе пробной аккредитации. Просмотри результат и разбор ошибок."
       : controlExamMode
@@ -723,7 +734,9 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
       : controlExamMode
         ? "Результат пока невысокий. Мы составили для вас план подготовки по слабым темам, начните с разбора ошибок."
         : "Порог не достигнут. Просмотри разбор ошибок и запусти повторную попытку.";
-  const resultVerdictLabel = resultPassed
+  const resultVerdictLabel = initialDiagnosticMode
+    ? "Стартовый срез сохранен"
+    : resultPassed
     ? strictAccreditationMode
       ? "Аккредитационный порог пройден"
       : controlExamMode
@@ -734,10 +747,16 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
     : "Порог не достигнут (70%)";
   const resultModeLabel = strictAccreditationMode
     ? "Пробная аккредитация"
+    : initialDiagnosticMode
+      ? "Стартовая диагностика"
     : controlExamMode
       ? "Контроль без подсказок"
       : "Учебный режим";
-  const examFeedbackSubtitle = strictAccreditationMode ? "Пробная аккредитация" : "Учебный контроль";
+  const examFeedbackSubtitle = strictAccreditationMode
+    ? "Пробная аккредитация"
+    : initialDiagnosticMode
+      ? "Стартовая диагностика"
+      : "Учебный контроль";
 
   const selectedStateByLabel = question
     ? Object.fromEntries(
@@ -823,7 +842,13 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
                   </div>
 
                   <h2 className={styles["result-title"]}>
-                    {resultMastered ? "Материал освоен!" : resultPassed ? "Порог пройден" : "Нужно повторить"}
+                    {initialDiagnosticMode
+                      ? "Диагностика завершена"
+                      : resultMastered
+                        ? "Материал освоен!"
+                        : resultPassed
+                          ? "Порог пройден"
+                          : "Нужно повторить"}
                   </h2>
                   <p className={styles["result-sub"]} data-testid="test-session-result-subtitle">
                     {resultSubtitle}
@@ -878,9 +903,9 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
                   <div>
                     <div className={styles["result-header-kicker"]}>Тест завершён</div>
                     <h1 className={styles["result-header-title"]}>
-                      {resultMastered ? "Материал" : resultPassed ? "Порог" : "Сессия"}
+                      {initialDiagnosticMode ? "Стартовый" : resultMastered ? "Материал" : resultPassed ? "Порог" : "Сессия"}
                       <br />
-                      <em>{resultMastered ? "освоен" : resultPassed ? "пройден" : "не пройдена"}</em>
+                      <em>{initialDiagnosticMode ? "срез сохранен" : resultMastered ? "освоен" : resultPassed ? "пройден" : "не пройдена"}</em>
                     </h1>
                     <p className={styles["result-header-subtitle"]} data-testid="test-session-result-subtitle">
                       {resultSubtitle}
@@ -909,7 +934,7 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
                         <h2 className={styles["result-title"]}>
                           {finishResult.correct_answers} из {finishResult.total_questions}
                           <br />
-                          <em>{resultMastered ? "освоено" : resultPassed ? "порог пройден" : "нужно повторить"}</em>
+                          <em>{initialDiagnosticMode ? "стартовый уровень" : resultMastered ? "освоено" : resultPassed ? "порог пройден" : "нужно повторить"}</em>
                         </h2>
                         <p className={styles["result-sub"]} data-testid="test-session-result-mode">
                           Точность {resultPercent}% · Отвечено {finishResult.answered_questions} из {finishResult.total_questions} ·{" "}

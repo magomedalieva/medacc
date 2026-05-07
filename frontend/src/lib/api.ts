@@ -579,6 +579,7 @@ export const api = {
       planned_task_id?: number | null;
       simulation_id?: string | null;
       question_ids?: number[] | null;
+      attempt_context?: "initial_diagnostic" | null;
     },
   ) {
     return request<TestSession>("/tests/sessions", { method: "POST", token, body: payload });

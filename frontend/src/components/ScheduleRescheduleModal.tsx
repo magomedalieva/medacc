@@ -1,13 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, type FormEvent } from "react";
 
-import { PLANNER_LOADING_POSTPONE_LABEL, PLANNER_RESCHEDULED_LABEL } from "../lib/plannerUi";
-import { Button } from "./Button";
-import { TextField } from "./TextField";
-import { Wrapper } from "./Wrapper";
+import { PLANNER_LOADING_POSTPONE_LABEL } from "../lib/plannerUi";
 import styles from "./ScheduleRescheduleModal.module.css";
 
 type ScheduleRescheduleModalProps = {
   availabilityNote: string;
+  canConfirm: boolean;
   currentDateLabel: string;
   firstAffectedTaskDateLabel: string | null;
   firstAffectedTaskTitle: string | null;
@@ -25,9 +23,8 @@ type ScheduleRescheduleModalProps = {
 
 export function ScheduleRescheduleModal({
   availabilityNote,
+  canConfirm,
   currentDateLabel,
-  firstAffectedTaskDateLabel,
-  firstAffectedTaskTitle,
   isSubmitting,
   maxDate,
   minDate,
@@ -35,7 +32,6 @@ export function ScheduleRescheduleModal({
   onConfirm,
   onDateChange,
   targetDate,
-  targetDateLabel,
   targetDaySummary,
   taskTitle,
 }: ScheduleRescheduleModalProps) {
@@ -50,82 +46,69 @@ export function ScheduleRescheduleModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isSubmitting, onClose]);
 
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!isSubmitting && canConfirm && targetDate.length > 0) {
+      onConfirm();
+    }
+  }
+
   return (
-    <div aria-modal="true" className={styles.overlay} role="dialog">
+    <div className={styles.overlay}>
       <div className={styles.backdrop} onClick={isSubmitting ? undefined : onClose} />
-      <div className={styles.modal}>
+      <form
+        aria-labelledby="schedule-reschedule-title"
+        aria-modal="true"
+        className={styles.modal}
+        onSubmit={handleSubmit}
+        role="dialog"
+      >
         <div className={styles.header}>
-          <div className={styles.kicker}>Планировщик</div>
-          <div className={styles.title}>Перенести задачу</div>
+          <div>
+            <div className={styles.kicker}>Планировщик</div>
+            <h2 className={styles.title} id="schedule-reschedule-title">
+              Перенести задачу
+            </h2>
+          </div>
+          <button aria-label="Закрыть" className={styles.close} disabled={isSubmitting} onClick={onClose} type="button">
+            ×
+          </button>
         </div>
 
         <div className={styles.body}>
-          <p className={styles.description}>
-            Выбери новую дату для задачи. Перед подтверждением видно, какая точка маршрута изменится первой.
-          </p>
-
-          <div className={styles.taskCard}>
-            <div className={styles.taskLabel}>Задача</div>
-            <div className={styles.taskTitle}>{taskTitle}</div>
-            <div className={styles.taskMeta}>Сейчас запланирована на {currentDateLabel}</div>
+          <div className={styles.task}>
+            <span>Задача</span>
+            <strong>{taskTitle}</strong>
+            <small>Сейчас: {currentDateLabel}</small>
           </div>
 
-          <TextField
-            label={PLANNER_RESCHEDULED_LABEL}
-            max={maxDate ?? undefined}
-            min={minDate}
-            onChange={(event) => onDateChange(event.target.value)}
-            type="date"
-            value={targetDate}
-          />
+          <label className={styles.field}>
+            <span>Новая дата</span>
+            <input
+              disabled={isSubmitting}
+              max={maxDate ?? undefined}
+              min={minDate}
+              onChange={(event) => onDateChange(event.target.value)}
+              type="date"
+              value={targetDate}
+            />
+          </label>
 
-          <div className={styles.preview}>
-            <div className={styles.previewLabel}>Что изменится</div>
-            <div className={styles.previewGrid}>
-              <div className={styles.previewCard}>
-                <div className={styles.previewKicker}>Сейчас</div>
-                <div className={styles.previewDate}>{currentDateLabel}</div>
-                <div className={styles.previewTitle}>{taskTitle}</div>
-              </div>
-
-              <div className={styles.previewCardAccent}>
-                <div className={styles.previewKicker}>После переноса</div>
-                <div className={styles.previewDate}>{targetDateLabel}</div>
-                <div className={styles.previewTitle}>{taskTitle}</div>
-                <div className={styles.previewHint}>{targetDaySummary}</div>
-              </div>
-            </div>
-
-            <div className={styles.impactCard}>
-              <div className={styles.impactLabel}>Первое затронутое место маршрута</div>
-              {firstAffectedTaskTitle && firstAffectedTaskDateLabel ? (
-                <>
-                  <div className={styles.impactTitle}>{firstAffectedTaskTitle}</div>
-                  <div className={styles.impactMeta}>
-                    Сейчас эта точка стоит на {firstAffectedTaskDateLabel}. После подтверждения она будет
-                    пересчитана вместе со следующими днями.
-                  </div>
-                </>
-              ) : (
-                <div className={styles.impactMeta}>
-                  После этой даты система просто пересчитает оставшиеся будущие слоты подготовки.
-                </div>
-              )}
-            </div>
-          </div>
+          <div className={styles.summary}>{targetDaySummary}</div>
 
           <div className={styles.note}>{availabilityNote}</div>
         </div>
 
-        <Wrapper align="center" direction="row" gap={10} justify="end" wrap>
-          <Button disabled={isSubmitting} onClick={onClose} variant="quiet">
+        <div className={styles.actions}>
+          <button disabled={isSubmitting} onClick={onClose} type="button">
             Отмена
-          </Button>
-          <Button disabled={isSubmitting || targetDate.length === 0} onClick={onConfirm} variant="primary">
+          </button>
+          <button className={styles.primary} disabled={isSubmitting || !canConfirm || targetDate.length === 0} type="submit">
             {isSubmitting ? PLANNER_LOADING_POSTPONE_LABEL : "Перенести"}
-          </Button>
-        </Wrapper>
-      </div>
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

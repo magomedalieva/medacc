@@ -2227,6 +2227,147 @@
   line-height: 1;
 }
 
+.exam-result-score.ok {
+  color: var(--green);
+}
+
+.exam-result-score.err {
+  color: var(--accent);
+}
+
+.stage-review-modal {
+  max-width: min(860px, calc(100vw - 36px));
+}
+
+.stage-review-inner {
+  align-items: stretch;
+  text-align: left;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.stage-review-head {
+  text-align: center;
+  display: flex;
+  justify-content: center;
+}
+
+.stage-review-head .success-desc {
+  margin: 10px auto 0;
+  max-width: 520px;
+}
+
+.stage-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.stage-review-group {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.stage-review-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 15px 16px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.stage-review-block {
+  padding: 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.stage-review-block:last-child {
+  border-bottom: none;
+}
+
+.check-review-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  margin-top: 8px;
+  background: var(--surface);
+}
+
+.check-review-row.ok {
+  border-color: var(--green-mid);
+  background: var(--green-lo);
+}
+
+.check-review-row.err {
+  border-color: var(--accent-mid);
+  background: var(--accent-lo);
+}
+
+.check-review-row.critical {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.check-review-row > span {
+  width: 28px;
+  height: 28px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.check-review-row.ok > span {
+  background: var(--green);
+}
+
+.check-review-row.err > span {
+  background: var(--accent);
+}
+
+.check-review-row strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.check-review-row p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--ink-70);
+}
+
+.check-review-row small {
+  display: inline-block;
+  margin-top: 6px;
+  font-family: var(--fm);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.fb-answer-line {
+  margin-bottom: 8px;
+  font-family: var(--fm);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
 .ss-item {
   text-align: center;
 }

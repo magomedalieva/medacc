@@ -200,6 +200,7 @@ export interface PlanTask {
   title: string;
   topic_id: number | null;
   topic_name: string | null;
+  topic_section_name: string | null;
   osce_station_slug: string | null;
   questions_count: number;
   estimated_minutes: number;
@@ -244,6 +245,9 @@ export interface AnalyticsOverview {
   correct_answers: number;
   accuracy_percent: number;
   completed_sessions: number;
+  initial_diagnostic_completed: boolean;
+  latest_initial_diagnostic_score_percent: number | null;
+  non_diagnostic_completed_sessions: number;
   streak_days: number;
   days_until_accreditation: number | null;
 }

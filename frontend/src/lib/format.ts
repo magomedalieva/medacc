@@ -71,7 +71,7 @@ export function percentage(value: number): string {
 
 export function taskWorkloadLabel(task: Pick<PlanTask, "task_type" | "questions_count">): string {
   if (task.task_type === "osce") {
-    return `${task.questions_count} элементов`;
+    return "чек-лист + мини-тест";
   }
 
   return `${task.questions_count} вопросов`;

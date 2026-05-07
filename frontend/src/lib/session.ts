@@ -56,6 +56,18 @@ export function buildTaskKindLabel(task: PlanTask) {
   return "Тренировочный тест";
 }
 
+export function buildTaskSectionLabel(task: PlanTask) {
+  if (!task.topic_section_name) {
+    return null;
+  }
+
+  if (task.topic_name && task.topic_section_name.trim().toLowerCase() === task.topic_name.trim().toLowerCase()) {
+    return null;
+  }
+
+  return task.topic_section_name;
+}
+
 export function buildAccreditationTaskRoute(task: PlanTask) {
   const searchParams = new URLSearchParams();
   searchParams.set("plannedTaskId", String(task.id));

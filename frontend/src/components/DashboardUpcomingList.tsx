@@ -1,5 +1,5 @@
 import { formatShortDate, taskWorkloadLabel } from "../lib/format";
-import { buildTaskKindLabel, buildTaskTitle, isWeeklyControlTask } from "../lib/session";
+import { buildTaskKindLabel, buildTaskSectionLabel, buildTaskTitle, isWeeklyControlTask } from "../lib/session";
 import type { PlanTask } from "../types/api";
 import type { DashboardTone } from "./DashboardBadge";
 import { DashboardBadge } from "./DashboardBadge";
@@ -24,6 +24,17 @@ function ArrowIcon() {
 
 function estimatedTimeLabel(minutes: number): string {
   return `≈ ${minutes} мин`;
+}
+
+function upcomingTaskMeta(task: PlanTask) {
+  return [
+    formatShortDate(task.scheduled_date),
+    buildTaskSectionLabel(task),
+    taskWorkloadLabel(task),
+    estimatedTimeLabel(task.estimated_minutes),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 export type DashboardUpcomingItem = {
@@ -61,7 +72,7 @@ export function DashboardUpcomingList({
           <div className={styles.body}>
             <div className={styles.title} title={buildTaskTitle(task)}>{buildTaskTitle(task)}</div>
             <div className={styles.meta}>
-              {formatShortDate(task.scheduled_date)} · {taskWorkloadLabel(task)} · {estimatedTimeLabel(task.estimated_minutes)}
+              {upcomingTaskMeta(task)}
             </div>
           </div>
           <div className={styles.side}>

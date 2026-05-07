@@ -805,6 +805,21 @@
   border-color: var(--ink-15);
 }
 
+.btn-danger {
+  min-height: 44px;
+  padding: 0 22px;
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent-mid);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--accent-lo);
+}
+
 .btn-arr {
   transition: transform 220ms var(--spring);
   display: flex;
@@ -918,6 +933,50 @@
   font-size: 13px;
   color: var(--ink-70);
   line-height: 1.7;
+}
+
+.confirm-modal {
+  max-width: 420px;
+}
+
+.confirm-body {
+  padding: 32px 26px;
+}
+
+.confirm-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  background: var(--accent-lo);
+  border: 1px solid var(--accent-mid);
+  color: var(--accent);
+}
+
+.confirm-title {
+  font-family: var(--fs);
+  font-size: 26px;
+  font-weight: 400;
+  margin-bottom: 9px;
+}
+
+.confirm-desc {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: var(--ink-70);
+  line-height: 1.72;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.confirm-actions .btn {
+  flex: 1;
 }
 
 .mode-opts {
@@ -1471,6 +1530,10 @@
   max-width: 460px;
 }
 
+.stage-review-card {
+  max-width: 780px;
+}
+
 .result-card .ai-head,
 .result-card .ai-score {
   display: none;
@@ -1751,6 +1814,123 @@
 
 .ai-acts .btn-p {
   flex: 1;
+}
+
+.stage-review-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--paper);
+}
+
+.stage-review-summary strong {
+  font-family: var(--fs);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.stage-review-summary span {
+  font-size: 13px;
+  color: var(--ink-70);
+}
+
+.stage-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stage-review-group {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.stage-review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.stage-review-kicker {
+  margin-bottom: 4px;
+  font-family: var(--fm);
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-40);
+}
+
+.stage-review-head h3 {
+  margin: 0;
+  font-family: var(--fs);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.15;
+}
+
+.stage-review-score {
+  font-family: var(--fs);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.stage-review-score.good {
+  color: var(--green);
+}
+
+.stage-review-score.bad {
+  color: var(--accent);
+}
+
+.stage-review-item {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.stage-review-item:last-child {
+  border-bottom: none;
+}
+
+.stage-review-item.good {
+  border-left: 3px solid var(--green);
+}
+
+.stage-review-item.bad {
+  border-left: 3px solid var(--accent);
+}
+
+.stage-review-question {
+  margin-bottom: 10px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.stage-review-answer {
+  margin-bottom: 5px;
+  color: var(--ink-70);
+}
+
+.stage-review-answer strong {
+  color: var(--ink);
+}
+
+.stage-review-item p {
+  margin: 10px 0 0;
+  color: var(--ink-70);
 }
 
 .case-review-actions {

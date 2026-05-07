@@ -8,6 +8,7 @@ from app.core.clock import utc_now
 from app.models.enums import PlanTaskType
 from app.models.plan_task import PlanTask
 from app.models.study_plan import StudyPlan
+from app.models.topic import Topic
 from app.repositories.base_repository import BaseRepository
 
 
@@ -18,7 +19,7 @@ class StudyPlanRepository(BaseRepository[StudyPlan]):
     async def get_by_user_id(self, user_id: int) -> StudyPlan | None:
         result = await self.session.execute(
             select(StudyPlan)
-            .options(selectinload(StudyPlan.tasks).selectinload(PlanTask.topic))
+            .options(selectinload(StudyPlan.tasks).selectinload(PlanTask.topic).selectinload(Topic.section))
             .where(StudyPlan.user_id == user_id)
         )
         return result.scalar_one_or_none()
@@ -48,7 +49,7 @@ class StudyPlanRepository(BaseRepository[StudyPlan]):
     async def list_tasks_in_range(self, plan_id: int, start_date: date, end_date: date) -> list[PlanTask]:
         result = await self.session.execute(
             select(PlanTask)
-            .options(selectinload(PlanTask.topic))
+            .options(selectinload(PlanTask.topic).selectinload(Topic.section))
             .where(
                 PlanTask.plan_id == plan_id,
                 PlanTask.scheduled_date >= start_date,
@@ -62,7 +63,7 @@ class StudyPlanRepository(BaseRepository[StudyPlan]):
         result = await self.session.execute(
             select(PlanTask)
             .join(PlanTask.plan)
-            .options(selectinload(PlanTask.topic))
+            .options(selectinload(PlanTask.topic).selectinload(Topic.section))
             .where(StudyPlan.user_id == user_id, PlanTask.id == task_id)
         )
         return result.scalar_one_or_none()
@@ -71,7 +72,7 @@ class StudyPlanRepository(BaseRepository[StudyPlan]):
         result = await self.session.execute(
             select(PlanTask)
             .join(PlanTask.plan)
-            .options(selectinload(PlanTask.topic))
+            .options(selectinload(PlanTask.topic).selectinload(Topic.section))
             .where(
                 StudyPlan.user_id == user_id,
                 PlanTask.is_completed.is_(False),
@@ -87,7 +88,7 @@ class StudyPlanRepository(BaseRepository[StudyPlan]):
         result = await self.session.execute(
             select(PlanTask)
             .join(PlanTask.plan)
-            .options(selectinload(PlanTask.topic))
+            .options(selectinload(PlanTask.topic).selectinload(Topic.section))
             .where(
                 StudyPlan.user_id == user_id,
                 PlanTask.scheduled_date < before_date,
@@ -110,7 +111,7 @@ class StudyPlanRepository(BaseRepository[StudyPlan]):
         result = await self.session.execute(
             select(PlanTask)
             .join(PlanTask.plan)
-            .options(selectinload(PlanTask.topic))
+            .options(selectinload(PlanTask.topic).selectinload(Topic.section))
             .where(
                 StudyPlan.user_id == user_id,
                 PlanTask.task_type == task_type,
@@ -137,7 +138,7 @@ class StudyPlanRepository(BaseRepository[StudyPlan]):
         result = await self.session.execute(
             select(PlanTask)
             .join(PlanTask.plan)
-            .options(selectinload(PlanTask.topic))
+            .options(selectinload(PlanTask.topic).selectinload(Topic.section))
             .where(
                 StudyPlan.user_id == user_id,
                 PlanTask.task_type == task_type,

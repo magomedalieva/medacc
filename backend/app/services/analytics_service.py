@@ -79,6 +79,9 @@ class AnalyticsService:
             correct_answers=metrics.correct_answers,
             accuracy_percent=accuracy_percent,
             completed_sessions=metrics.completed_sessions,
+            initial_diagnostic_completed=metrics.initial_diagnostic_completed,
+            latest_initial_diagnostic_score_percent=metrics.latest_initial_diagnostic_score_percent,
+            non_diagnostic_completed_sessions=metrics.non_diagnostic_completed_sessions,
             streak_days=user.streak_days,
             days_until_accreditation=self._calculate_days_until_accreditation(user.accreditation_date),
         )

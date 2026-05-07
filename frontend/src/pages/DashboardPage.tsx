@@ -107,10 +107,19 @@ function needsStartDiagnostic(state: DashboardState | null): boolean {
   }
 
   return (
+    !state.overview.initial_diagnostic_completed &&
     state.overview.total_answered === 0 &&
     state.overview.completed_sessions === 0 &&
     state.readiness.tracks.every((track) => track.volume_percent === 0)
   );
+}
+
+function hasOnlyInitialDiagnostic(state: DashboardState | null): boolean {
+  if (!state) {
+    return false;
+  }
+
+  return state.overview.initial_diagnostic_completed && state.overview.non_diagnostic_completed_sessions === 0;
 }
 
 function buildTaskDescription(task: PlanTask, isOverdue: boolean): string {
@@ -446,6 +455,7 @@ export function DashboardPage() {
         mode: "exam",
         planned_task_id: null,
         simulation_id: null,
+        attempt_context: "initial_diagnostic",
       });
 
       startTransition(() => navigate(`/app/tests/${session.id}`));
@@ -525,6 +535,7 @@ export function DashboardPage() {
   const todayIsStudyDay = isStudyDateAllowed(serverToday, activeStudyWeekdays);
   const todayHasStudyTime = (state?.schedule.remaining_study_seconds ?? user.daily_study_minutes * 60) > 0;
   const startDiagnosticNeeded = needsStartDiagnostic(state);
+  const initialDiagnosticOnly = hasOnlyInitialDiagnostic(state);
   const nextStudyDate = todayIsStudyDay
     ? serverToday
     : findNextAllowedStudyDate(
@@ -556,8 +567,12 @@ export function DashboardPage() {
     }),
   );
   const focusAnalyticsTab = analyticsTabForFocusKey(state?.readiness.recommended_focus_key);
-  const progressActionLabel = startDiagnosticNeeded ? "Начать диагностику" : focusActionLabel(focusAnalyticsTab);
-  const progressActionRoute = `/app/analytics?tab=${focusAnalyticsTab}`;
+  const progressActionLabel = startDiagnosticNeeded
+    ? "Начать диагностику"
+    : initialDiagnosticOnly
+      ? "Открыть план"
+      : focusActionLabel(focusAnalyticsTab);
+  const progressActionRoute = initialDiagnosticOnly ? "/app/schedule" : `/app/analytics?tab=${focusAnalyticsTab}`;
   const protocolActionRoute = "/app/accreditation";
 
   return (
@@ -654,7 +669,9 @@ export function DashboardPage() {
                   startTransition(() => navigate(protocolActionRoute))
                 }
                 focusActionLabel={progressActionLabel}
+                initialDiagnosticPercent={state.overview.latest_initial_diagnostic_score_percent}
                 isInitialState={startDiagnosticNeeded}
+                isInitialDiagnosticOnly={initialDiagnosticOnly}
                 readiness={state.readiness}
               />
             </DashboardSection>

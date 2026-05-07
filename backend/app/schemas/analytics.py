@@ -8,6 +8,9 @@ class AnalyticsOverviewResponse(BaseModel):
     correct_answers: int
     accuracy_percent: float
     completed_sessions: int
+    initial_diagnostic_completed: bool = False
+    latest_initial_diagnostic_score_percent: float | None = None
+    non_diagnostic_completed_sessions: int = 0
     streak_days: int
     days_until_accreditation: int | None
 

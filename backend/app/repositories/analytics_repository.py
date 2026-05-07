@@ -2,8 +2,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import case, func, select, true
+from sqlalchemy import and_, case, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.models.clinical_case_attempt import ClinicalCaseAttempt
 from app.models.daily_stat import DailyStat
@@ -14,6 +15,7 @@ from app.models.section import Section
 from app.models.test_session import TestSession
 from app.models.test_session_answer import TestSessionAnswer
 from app.models.topic import Topic
+from app.services.evidence_context import ATTEMPT_CONTEXT_CONTROL, ATTEMPT_CONTEXT_INITIAL_DIAGNOSTIC
 
 
 @dataclass
@@ -21,6 +23,9 @@ class OverviewMetrics:
     total_answered: int
     correct_answers: int
     completed_sessions: int
+    initial_diagnostic_completed: bool
+    latest_initial_diagnostic_score_percent: float | None
+    non_diagnostic_completed_sessions: int
 
 
 @dataclass
@@ -123,7 +128,32 @@ class AnalyticsRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    @staticmethod
+    def _initial_diagnostic_filter(user_id: int):
+        first_session = aliased(TestSession)
+        first_finished_at = (
+            select(func.min(first_session.finished_at))
+            .where(
+                first_session.user_id == user_id,
+                first_session.status == TestSessionStatus.FINISHED,
+            )
+            .scalar_subquery()
+        )
+
+        legacy_start_diagnostic = and_(
+            TestSession.attempt_context == ATTEMPT_CONTEXT_CONTROL,
+            TestSession.mode == TestSessionMode.EXAM,
+            TestSession.topic_id.is_(None),
+            TestSession.planned_task_id.is_(None),
+            TestSession.simulation_id.is_(None),
+            TestSession.total_questions == 30,
+            TestSession.finished_at == first_finished_at,
+        )
+
+        return or_(TestSession.attempt_context == ATTEMPT_CONTEXT_INITIAL_DIAGNOSTIC, legacy_start_diagnostic)
+
     async def get_overview_metrics(self, user_id: int) -> OverviewMetrics:
+        initial_diagnostic_filter = self._initial_diagnostic_filter(user_id)
         test_answer_metrics_subquery = (
             select(
                 func.count(TestSessionAnswer.id).label("answered_questions"),
@@ -137,12 +167,33 @@ class AnalyticsRepository:
             .subquery()
         )
         test_session_metrics_subquery = (
-            select(func.count(TestSession.id).label("completed_sessions"))
+            select(
+                func.count(TestSession.id).label("completed_sessions"),
+                func.coalesce(
+                    func.sum(case((initial_diagnostic_filter, 1), else_=0)),
+                    0,
+                ).label("initial_diagnostic_sessions"),
+                func.coalesce(
+                    func.sum(case((~initial_diagnostic_filter, 1), else_=0)),
+                    0,
+                ).label("non_diagnostic_completed_sessions"),
+            )
             .where(
                 TestSession.user_id == user_id,
                 TestSession.status == TestSessionStatus.FINISHED,
             )
             .subquery()
+        )
+        latest_initial_diagnostic_score = (
+            select(TestSession.score_percent)
+            .where(
+                TestSession.user_id == user_id,
+                TestSession.status == TestSessionStatus.FINISHED,
+                initial_diagnostic_filter,
+            )
+            .order_by(TestSession.finished_at.desc(), TestSession.id.desc())
+            .limit(1)
+            .scalar_subquery()
         )
         case_metrics_subquery = (
             select(
@@ -151,6 +202,11 @@ class AnalyticsRepository:
                 func.count(ClinicalCaseAttempt.id).label("completed_sessions"),
             )
             .where(ClinicalCaseAttempt.user_id == user_id)
+            .subquery()
+        )
+        osce_metrics_subquery = (
+            select(func.count(OsceAttempt.id).label("completed_sessions"))
+            .where(OsceAttempt.user_id == user_id)
             .subquery()
         )
 
@@ -167,11 +223,20 @@ class AnalyticsRepository:
                 (
                     func.coalesce(test_session_metrics_subquery.c.completed_sessions, 0)
                     + func.coalesce(case_metrics_subquery.c.completed_sessions, 0)
+                    + func.coalesce(osce_metrics_subquery.c.completed_sessions, 0)
+                ),
+                func.coalesce(test_session_metrics_subquery.c.initial_diagnostic_sessions, 0),
+                latest_initial_diagnostic_score,
+                (
+                    func.coalesce(test_session_metrics_subquery.c.non_diagnostic_completed_sessions, 0)
+                    + func.coalesce(case_metrics_subquery.c.completed_sessions, 0)
+                    + func.coalesce(osce_metrics_subquery.c.completed_sessions, 0)
                 ),
             )
             .select_from(test_answer_metrics_subquery)
             .join(test_session_metrics_subquery, true())
             .join(case_metrics_subquery, true())
+            .join(osce_metrics_subquery, true())
         )
         row = result.one()
 
@@ -179,6 +244,9 @@ class AnalyticsRepository:
             total_answered=int(row[0] or 0),
             correct_answers=int(row[1] or 0),
             completed_sessions=int(row[2] or 0),
+            initial_diagnostic_completed=int(row[3] or 0) > 0,
+            latest_initial_diagnostic_score_percent=float(row[4]) if row[4] is not None else None,
+            non_diagnostic_completed_sessions=int(row[5] or 0),
         )
 
     async def list_topic_metrics(self, user_id: int, faculty_id: int) -> list[TopicMetrics]:
@@ -549,6 +617,7 @@ class AnalyticsRepository:
                 TestSession.user_id == user_id,
                 TestSession.status == TestSessionStatus.FINISHED,
                 TestSession.mode == TestSessionMode.EXAM,
+                ~self._initial_diagnostic_filter(user_id),
             )
         )
         row = result.one()
@@ -576,6 +645,7 @@ class AnalyticsRepository:
                 TestSession.user_id == user_id,
                 TestSession.status == TestSessionStatus.FINISHED,
                 TestSession.mode == TestSessionMode.EXAM,
+                ~self._initial_diagnostic_filter(user_id),
             )
             .subquery()
         )
@@ -588,6 +658,7 @@ class AnalyticsRepository:
                 TestSession.user_id == user_id,
                 TestSession.status == TestSessionStatus.FINISHED,
                 TestSession.mode == TestSessionMode.EXAM,
+                ~self._initial_diagnostic_filter(user_id),
                 TestSession.total_questions >= 80,
             )
             .subquery()
@@ -598,6 +669,7 @@ class AnalyticsRepository:
                 TestSession.user_id == user_id,
                 TestSession.status == TestSessionStatus.FINISHED,
                 TestSession.mode == TestSessionMode.EXAM,
+                ~self._initial_diagnostic_filter(user_id),
                 TestSession.total_questions >= 80,
             )
             .order_by(TestSession.finished_at.desc(), TestSession.id.desc())

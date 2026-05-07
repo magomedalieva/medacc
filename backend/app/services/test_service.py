@@ -25,12 +25,13 @@ from app.schemas.test import (
     TestSessionResponse,
 )
 from app.services.accreditation_service import AccreditationService
-from app.services.evidence_context import resolve_attempt_context
+from app.services.evidence_context import ATTEMPT_CONTEXT_INITIAL_DIAGNOSTIC, resolve_attempt_context
 from app.services.schedule_service import ScheduleService
 
 
 EXAM_TIME_LIMIT_MINUTES = 60
 ACCREDITATION_EXAM_QUESTION_COUNT = 80
+INITIAL_DIAGNOSTIC_QUESTION_COUNT = 30
 
 
 class TestService:
@@ -48,6 +49,8 @@ class TestService:
 
         if payload.question_ids is not None and explicit_question_ids is None:
             raise BadRequestError("Не удалось собрать вопросы для повторения")
+
+        self._validate_initial_diagnostic_request(payload, explicit_question_ids)
 
         if payload.simulation_id is not None:
             if explicit_question_ids is not None:
@@ -118,6 +121,8 @@ class TestService:
                 "В выбранном разделе пока нет активных вопросов. Добавь вопросы в админке или выбери другой тест."
             )
 
+        self._validate_initial_diagnostic_availability(payload, available_question_count)
+
         is_full_exam_simulation = (
             payload.mode == TestSessionMode.EXAM
             and payload.topic_id is None
@@ -144,6 +149,13 @@ class TestService:
 
         time_limit_minutes = EXAM_TIME_LIMIT_MINUTES if payload.mode == TestSessionMode.EXAM else None
 
+        attempt_context = payload.attempt_context or resolve_attempt_context(
+            simulation_id=payload.simulation_id,
+            planned_task_id=payload.planned_task_id,
+            mode=payload.mode.value,
+            is_remediation=explicit_question_ids is not None,
+        )
+
         test_session = TestSession(
             user_id=user.id,
             mode=payload.mode,
@@ -151,12 +163,7 @@ class TestService:
             topic_id=payload.topic_id,
             planned_task_id=payload.planned_task_id,
             simulation_id=payload.simulation_id,
-            attempt_context=resolve_attempt_context(
-                simulation_id=payload.simulation_id,
-                planned_task_id=payload.planned_task_id,
-                mode=payload.mode.value,
-                is_remediation=explicit_question_ids is not None,
-            ),
+            attempt_context=attempt_context,
             question_ids=[question.id for question in questions],
             total_questions=resolved_question_count,
             current_index=0,
@@ -295,7 +302,9 @@ class TestService:
             simulation_id=test_session.simulation_id,
             completion_source="exam_simulation" if test_session.simulation_id is not None else None,
             allow_equivalent_free_practice=(
-                test_session.simulation_id is None and answered_questions >= test_session.total_questions
+                test_session.simulation_id is None
+                and test_session.attempt_context != ATTEMPT_CONTEXT_INITIAL_DIAGNOSTIC
+                and answered_questions >= test_session.total_questions
             ),
         )
 
@@ -337,6 +346,44 @@ class TestService:
 
     async def _acquire_user_transaction_lock(self, user_id: int) -> None:
         await self.session.execute(select(func.pg_advisory_xact_lock(user_id)))
+
+    @staticmethod
+    def _validate_initial_diagnostic_request(
+        payload: TestSessionCreateRequest,
+        explicit_question_ids: list[int] | None,
+    ) -> None:
+        if payload.attempt_context != ATTEMPT_CONTEXT_INITIAL_DIAGNOSTIC:
+            return
+
+        if (
+            payload.mode != TestSessionMode.EXAM
+            or payload.topic_id is not None
+            or payload.planned_task_id is not None
+            or payload.simulation_id is not None
+            or explicit_question_ids is not None
+        ):
+            raise BadRequestError("Стартовая диагностика запускается как смешанный контроль без привязки к плану")
+
+        if payload.question_count != INITIAL_DIAGNOSTIC_QUESTION_COUNT:
+            raise BadRequestError(
+                f"Стартовая диагностика должна содержать ровно {INITIAL_DIAGNOSTIC_QUESTION_COUNT} вопросов"
+            )
+
+    @staticmethod
+    def _validate_initial_diagnostic_availability(
+        payload: TestSessionCreateRequest,
+        available_question_count: int,
+    ) -> None:
+        if payload.attempt_context != ATTEMPT_CONTEXT_INITIAL_DIAGNOSTIC:
+            return
+
+        if available_question_count < INITIAL_DIAGNOSTIC_QUESTION_COUNT:
+            missing_count = INITIAL_DIAGNOSTIC_QUESTION_COUNT - available_question_count
+            raise BadRequestError(
+                "Для стартовой диагностики нужно 30 активных вопросов. "
+                f"Сейчас доступно {available_question_count}, не хватает {missing_count}. "
+                "Добавь вопросы в админке или запусти обычную тренировку."
+            )
 
     @staticmethod
     def _normalize_question_ids(question_ids: list[int] | None) -> list[int] | None:

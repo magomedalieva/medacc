@@ -22,6 +22,7 @@ class PlanTaskResponse(BaseModel):
     title: str
     topic_id: int | None
     topic_name: str | None
+    topic_section_name: str | None = None
     osce_station_slug: str | None
     questions_count: int
     estimated_minutes: int

@@ -320,6 +320,10 @@
   color: var(--accent);
 }
 
+.route-date-label.overdue {
+  color: var(--accent);
+}
+
 .route-task {
   width: 100%;
   min-height: 68px;
@@ -340,6 +344,12 @@
 }
 
 .route-date-label.today + .route-task {
+  border-color: var(--accent-mid);
+  background: var(--accent-lo);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.route-date-label.overdue + .route-task {
   border-color: var(--accent-mid);
   background: var(--accent-lo);
   box-shadow: inset 2px 0 0 var(--accent);
@@ -441,6 +451,15 @@
 .route-open:hover {
   color: var(--accent);
   background: transparent;
+}
+
+.route-open:disabled {
+  cursor: default;
+  color: var(--ink-30);
+}
+
+.route-open:disabled:hover {
+  color: var(--ink-30);
 }
 
 .completed-card {
@@ -716,6 +735,10 @@
   box-shadow: 0 4px 14px var(--accent-lo);
 }
 
+.secondary {
+  min-width: 158px;
+}
+
 .ghost {
   min-width: 158px;
   border-color: transparent;
@@ -729,6 +752,10 @@
   background: var(--accent-lo);
   color: var(--accent);
   box-shadow: 0 4px 14px var(--accent-lo);
+}
+
+.matched-action {
+  width: 174px;
 }
 
 .primary:active,
@@ -1197,6 +1224,85 @@
     0 34px 90px rgba(0, 0, 0, 0.26),
     0 8px 26px rgba(0, 0, 0, 0.14);
   animation: popover-in 180ms var(--ease) both;
+}
+
+.confirm-popover {
+  width: min(430px, calc(100vw - 32px));
+  display: grid;
+  gap: 18px;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  box-shadow:
+    0 34px 90px rgba(0, 0, 0, 0.24),
+    0 8px 26px rgba(0, 0, 0, 0.12);
+  animation: popover-in 180ms var(--ease) both;
+}
+
+.confirm-kicker {
+  color: var(--accent);
+  font-family: var(--fm);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.confirm-popover h2 {
+  margin: -6px 0 0;
+  font-family: var(--fs);
+  font-size: 31px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.confirm-popover p {
+  margin: 0;
+  color: var(--ink-70);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.confirm-actions button {
+  min-height: 42px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--fm);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.confirm-actions button:hover {
+  border-color: var(--accent-mid);
+  color: var(--accent);
+}
+
+.confirm-actions .danger {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.confirm-actions .danger:hover {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.confirm-actions button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .history-popover {
@@ -1748,6 +1854,10 @@
   .day-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .matched-action {
+    width: 100%;
   }
 
   .legend {

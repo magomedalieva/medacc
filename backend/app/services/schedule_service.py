@@ -61,11 +61,11 @@ logger = logging.getLogger(__name__)
 
 INTENSIVE_RATIO = 0.6
 REINFORCEMENT_RATIO = 0.9
-FOCUSED_TEST_QUESTION_COUNT = 6
-MIXED_TEST_QUESTION_COUNT = 12
+FOCUSED_TEST_QUESTION_COUNT = 30
+MIXED_TEST_QUESTION_COUNT = 50
 EXAM_SIM_QUESTION_COUNT = 80
-FOCUSED_TEST_MINUTES = 12
-MIXED_TEST_MINUTES = 20
+FOCUSED_TEST_MINUTES = 30
+MIXED_TEST_MINUTES = 45
 EXAM_SIM_MINUTES = 60
 CASE_SIM_QUESTION_COUNT = CASE_QUIZ_QUESTION_COUNT
 CASE_SIM_MINUTES = 30
@@ -109,16 +109,8 @@ MAX_DAILY_STUDY_MINUTES = 180
 GENTLE_TASK_BUDGET_RATIO = 0.58
 STEADY_TASK_BUDGET_RATIO = 0.72
 INTENSIVE_TASK_BUDGET_RATIO = 0.86
-FOCUSED_TASK_MINUTES_MIN = 12
-FOCUSED_TASK_MINUTES_MAX = 24
-MIXED_TASK_MINUTES_MIN = 18
-MIXED_TASK_MINUTES_MAX = 34
 CASE_TASK_MINUTES_MIN = 25
 CASE_TASK_MINUTES_MAX = 42
-FOCUSED_TASK_QUESTIONS_MIN = 6
-FOCUSED_TASK_QUESTIONS_MAX = 12
-MIXED_TASK_QUESTIONS_MIN = 10
-MIXED_TASK_QUESTIONS_MAX = 18
 FINAL_PHASE_OVERALL_GATE_PERCENT = 55.0
 FINAL_PHASE_TEST_GATE_PERCENT = 60.0
 RECENT_ACTIVITY_WINDOW_DAYS = 14
@@ -131,17 +123,15 @@ FINAL_PHASE_CYCLE_LENGTH = 4
 FINAL_PHASE_REINFORCEMENT_SLOT = 1
 FINAL_PHASE_CASE_SLOT = 2
 FINAL_PHASE_OSCE_SLOT = 3
-FINAL_APPROACH_BROAD_REVIEW_QUESTION_CAP = 14
-FINAL_APPROACH_BROAD_REVIEW_MINUTES_CAP = 24
-FINAL_WEEK_BROAD_REVIEW_QUESTION_CAP = 12
-FINAL_WEEK_BROAD_REVIEW_MINUTES_CAP = 22
-PRE_ACCREDITATION_REVIEW_QUESTION_COUNT = 10
-PRE_ACCREDITATION_REVIEW_MINUTES = 18
-RECOVERY_REVIEW_QUESTION_CAP = 10
-RECOVERY_REVIEW_MINUTES_CAP = 18
-SUPPLEMENTAL_TEST_QUESTION_COUNT = 6
-SUPPLEMENTAL_TEST_MINUTES = 12
-DAILY_BUDGET_MINIMUM_FILL_RATIO = 0.72
+FINAL_APPROACH_BROAD_REVIEW_QUESTION_CAP = MIXED_TEST_QUESTION_COUNT
+FINAL_APPROACH_BROAD_REVIEW_MINUTES_CAP = MIXED_TEST_MINUTES
+FINAL_WEEK_BROAD_REVIEW_QUESTION_CAP = MIXED_TEST_QUESTION_COUNT
+FINAL_WEEK_BROAD_REVIEW_MINUTES_CAP = MIXED_TEST_MINUTES
+PRE_ACCREDITATION_REVIEW_QUESTION_COUNT = FOCUSED_TEST_QUESTION_COUNT
+PRE_ACCREDITATION_REVIEW_MINUTES = FOCUSED_TEST_MINUTES
+RECOVERY_REVIEW_QUESTION_CAP = FOCUSED_TEST_QUESTION_COUNT
+RECOVERY_REVIEW_MINUTES_CAP = FOCUSED_TEST_MINUTES
+SUPPLEMENTAL_TEST_MINUTES = FOCUSED_TEST_MINUTES
 HEAVY_SLOT_ENERGY_THRESHOLD = 0.95
 RECOVERY_DAY_ENERGY_THRESHOLD = 0.8
 FINAL_REHEARSAL_TEST_DAY = 6
@@ -459,6 +449,7 @@ class ScheduleService:
         if allow_catch_up:
             await self._apply_catch_up_mode_if_needed(user, server_today)
             await self._apply_non_study_today_rebuild_if_needed(user, server_today)
+            await self._apply_test_volume_policy_if_needed(user, server_today)
 
         plan = await self.study_plan_repository.get_by_user_id(user.id)
         events = await self.plan_event_repository.list_by_user(user.id, limit=PLAN_EVENT_PREVIEW_LIMIT)
@@ -491,6 +482,7 @@ class ScheduleService:
         if allow_catch_up:
             await self._apply_catch_up_mode_if_needed(user, server_today)
             await self._apply_non_study_today_rebuild_if_needed(user, server_today)
+            await self._apply_test_volume_policy_if_needed(user, server_today)
 
         plan = await self.study_plan_repository.get_by_user_id(user.id)
         explanation_context = await self._build_task_explanation_context(user)
@@ -1477,6 +1469,11 @@ class ScheduleService:
         task: PlanTask,
         explanation_context: TaskExplanationContext | None = None,
     ) -> PlanTaskResponse:
+        topic_section = None
+
+        if task.topic is not None and "section" in task.topic.__dict__:
+            topic_section = task.topic.section.name if task.topic.section is not None else None
+
         return PlanTaskResponse(
             id=task.id,
             scheduled_date=task.scheduled_date,
@@ -1490,6 +1487,7 @@ class ScheduleService:
             title=self._resolve_task_title(task),
             topic_id=task.topic_id,
             topic_name=task.topic.name if task.topic is not None else None,
+            topic_section_name=topic_section,
             osce_station_slug=task.osce_station_slug,
             questions_count=task.questions_count,
             estimated_minutes=task.estimated_minutes,
@@ -1966,12 +1964,8 @@ class ScheduleService:
         load_profile = self._build_user_study_load_profile(user)
         remaining_minutes = budget["remaining_study_seconds"] // 60
 
-        if remaining_minutes >= load_profile.focused_test_minutes:
-            questions_count = load_profile.focused_test_question_count
-            estimated_minutes = load_profile.focused_test_minutes
-        else:
-            questions_count = min(load_profile.focused_test_question_count, SUPPLEMENTAL_TEST_QUESTION_COUNT)
-            estimated_minutes = SUPPLEMENTAL_TEST_MINUTES
+        if remaining_minutes < load_profile.focused_test_minutes:
+            return
 
         topics = await self._list_prioritized_topics(user)
         used_topic_ids = {task.topic_id for task in today_tasks if task.topic_id is not None}
@@ -1984,8 +1978,8 @@ class ScheduleService:
             plan.id,
             server_today,
             topic.topic.id if topic is not None else None,
-            questions_count,
-            estimated_minutes,
+            load_profile.focused_test_question_count,
+            load_profile.focused_test_minutes,
         )
         task.task_title = "Дополнительный блок на сегодня"
         self.session.add(task)
@@ -2147,6 +2141,68 @@ class ScheduleService:
         await self._replace_plan_from_date(user, server_today)
         await self.session.commit()
         return True
+
+    async def _apply_test_volume_policy_if_needed(self, user: User, server_today: date) -> bool:
+        if user.faculty_id is None or user.accreditation_date is None:
+            return False
+
+        plan = await self.study_plan_repository.get_by_user_id(user.id)
+        if plan is None:
+            return False
+
+        if not await self._has_legacy_short_test_tasks(plan.id, server_today, user.accreditation_date):
+            return False
+
+        await self._acquire_user_transaction_lock(user.id)
+        plan = await self.study_plan_repository.get_by_user_id(user.id)
+        if plan is None:
+            return False
+
+        if not await self._has_legacy_short_test_tasks(plan.id, server_today, user.accreditation_date):
+            return False
+
+        await self._replace_plan_from_date(user, server_today)
+        await self.session.commit()
+        return True
+
+    async def _has_legacy_short_test_tasks(self, plan_id: int, server_today: date, accreditation_date: date) -> bool:
+        tasks = await self.study_plan_repository.list_tasks_in_range(plan_id, server_today, accreditation_date)
+
+        return any(self._is_legacy_short_test_task(task) for task in tasks)
+
+    def _is_legacy_short_test_task(self, task: PlanTask) -> bool:
+        if task.is_completed or task.is_skipped or getattr(task, "is_stale", False):
+            return False
+
+        expected_questions = self._expected_test_task_question_count(task)
+        return expected_questions is not None and task.questions_count < expected_questions
+
+    def _expected_test_task_question_count(self, task: PlanTask) -> int | None:
+        if task.task_type == PlanTaskType.TEST:
+            if task.task_variant == PlanTaskVariant.RECOVERY_REVIEW:
+                return RECOVERY_REVIEW_QUESTION_CAP
+
+            if task.task_variant == PlanTaskVariant.PRE_ACCREDITATION_REVIEW:
+                return PRE_ACCREDITATION_REVIEW_QUESTION_COUNT
+
+            if task.task_variant in {
+                PlanTaskVariant.FINAL_APPROACH_REVIEW,
+                PlanTaskVariant.FINAL_WEEK_BROAD_REVIEW,
+            }:
+                return MIXED_TEST_QUESTION_COUNT
+
+            if self._resolve_task_intent(task) in {"control", "remediation"} or task.topic_id is None:
+                return MIXED_TEST_QUESTION_COUNT
+
+            return FOCUSED_TEST_QUESTION_COUNT
+
+        if task.task_type == PlanTaskType.EXAM_SIM:
+            if self._resolve_task_intent(task) == "exam_checkpoint":
+                return EXAM_SIM_QUESTION_COUNT
+
+            return MIXED_TEST_QUESTION_COUNT
+
+        return None
 
     async def _build_protocol_confirmation_context(self, user: User) -> ProtocolConfirmationContext:
         simulation = await self.exam_simulation_repository.get_latest_by_user(user.id)
@@ -2584,39 +2640,21 @@ class ScheduleService:
             osce_share_shift = 0.0
 
         task_budget_minutes = self._clamp_int(round(daily_minutes * task_budget_ratio), 18, CASE_TASK_MINUTES_MAX)
-        focused_minutes = self._clamp_int(
-            round(task_budget_minutes * 0.58),
-            FOCUSED_TASK_MINUTES_MIN,
-            FOCUSED_TASK_MINUTES_MAX,
-        )
-        mixed_minutes = self._clamp_int(
-            round(task_budget_minutes * 0.82),
-            MIXED_TASK_MINUTES_MIN,
-            MIXED_TASK_MINUTES_MAX,
-        )
+        focused_minutes = FOCUSED_TEST_MINUTES
+        mixed_minutes = MIXED_TEST_MINUTES
         case_minutes = self._clamp_int(
             max(round(task_budget_minutes * 1.02), CASE_TASK_MINUTES_MIN),
             CASE_TASK_MINUTES_MIN,
             CASE_TASK_MINUTES_MAX,
-        )
-        focused_questions = self._clamp_int(
-            round(focused_minutes / 2),
-            FOCUSED_TASK_QUESTIONS_MIN,
-            FOCUSED_TASK_QUESTIONS_MAX,
-        )
-        mixed_questions = self._clamp_int(
-            round(mixed_minutes / 1.8),
-            MIXED_TASK_QUESTIONS_MIN,
-            MIXED_TASK_QUESTIONS_MAX,
         )
 
         return UserStudyLoadProfile(
             daily_minutes=daily_minutes,
             intensity=intensity,
             study_weekdays=study_weekdays,
-            focused_test_question_count=focused_questions,
+            focused_test_question_count=FOCUSED_TEST_QUESTION_COUNT,
             focused_test_minutes=focused_minutes,
-            mixed_test_question_count=mixed_questions,
+            mixed_test_question_count=MIXED_TEST_QUESTION_COUNT,
             mixed_test_minutes=mixed_minutes,
             case_task_minutes=case_minutes,
             intensive_ratio_shift=intensive_ratio_shift,
@@ -2825,25 +2863,32 @@ class ScheduleService:
                 if remaining_minutes < SUPPLEMENTAL_TEST_MINUTES:
                     break
 
-                minimum_fill_minutes = round(load_profile.daily_minutes * DAILY_BUDGET_MINIMUM_FILL_RATIO)
                 should_add_full_focus = remaining_minutes >= load_profile.focused_test_minutes
-                should_add_mini = planned_minutes < minimum_fill_minutes
 
                 if should_add_full_focus:
                     questions_count = load_profile.focused_test_question_count
                     estimated_minutes = load_profile.focused_test_minutes
-                elif should_add_mini:
-                    questions_count = min(load_profile.focused_test_question_count, SUPPLEMENTAL_TEST_QUESTION_COUNT)
-                    estimated_minutes = SUPPLEMENTAL_TEST_MINUTES
                 else:
                     break
 
-                topic_id = (
-                    topic_sequence[topic_index % len(topic_sequence)].topic.id
-                    if topic_sequence
-                    else None
-                )
-                topic_index += 1
+                day_topic_ids = {task.topic_id for task in day_tasks if task.topic_id is not None}
+                topic_id = None
+
+                if topic_sequence:
+                    topic_pool_size = len({planned_topic.topic.id for planned_topic in topic_sequence})
+
+                    for _ in range(len(topic_sequence)):
+                        candidate = topic_sequence[topic_index % len(topic_sequence)]
+                        topic_index += 1
+
+                        if candidate.topic.id not in day_topic_ids or len(day_topic_ids) >= topic_pool_size:
+                            topic_id = candidate.topic.id
+                            break
+
+                    if topic_id is None:
+                        topic_id = topic_sequence[topic_index % len(topic_sequence)].topic.id
+                        topic_index += 1
+
                 task = self._build_test_task(
                     plan_id,
                     scheduled_date,
@@ -3249,12 +3294,15 @@ class ScheduleService:
         primary_band = topics[:primary_band_count]
         sequence: list[PlannedTopic] = []
 
-        for topic in primary_band:
-            for _ in range(topic.recommended_repeats):
+        max_repeats = max((max(topic.recommended_repeats, 1) for topic in primary_band), default=0)
+
+        for repeat_index in range(max_repeats):
+            for topic in primary_band:
                 if len(sequence) >= target_count:
                     return sequence
 
-                sequence.append(topic)
+                if repeat_index < max(topic.recommended_repeats, 1):
+                    sequence.append(topic)
 
         for topic in topics[primary_band_count:]:
             if len(sequence) >= target_count:
@@ -3266,8 +3314,13 @@ class ScheduleService:
         filler_index = 0
 
         while len(sequence) < target_count:
-            sequence.append(filler_source[filler_index % len(filler_source)])
+            candidate = filler_source[filler_index % len(filler_source)]
             filler_index += 1
+
+            if len(filler_source) > 1 and sequence and sequence[-1].topic.id == candidate.topic.id:
+                continue
+
+            sequence.append(candidate)
 
         return sequence
 

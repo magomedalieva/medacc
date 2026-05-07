@@ -1,4 +1,4 @@
-import { formatShortDate } from "../lib/format";
+import { formatShortDate, taskWorkloadLabel } from "../lib/format";
 import {
   plannerEmptyStateCopy,
   plannerStatusLabel,
@@ -7,7 +7,7 @@ import {
   PLANNER_NEXT_STUDY_DAY_BUTTON_LABEL,
   PLANNER_SKIP_BUTTON_LABEL,
 } from "../lib/plannerUi";
-import { buildTaskKindLabel, buildTaskTitle, isWeeklyControlTask } from "../lib/session";
+import { buildTaskKindLabel, buildTaskSectionLabel, buildTaskTitle, isWeeklyControlTask } from "../lib/session";
 import type { PlanTask } from "../types/api";
 import { DashboardBadge } from "./DashboardBadge";
 import { DashboardButton } from "./DashboardButton";
@@ -237,6 +237,7 @@ export function DashboardTodayCard({
 }) {
   const busy = starting || postponing || skipping;
   const taskKindTone = isWeeklyControlTask(task) ? "gold" : "default";
+  const sectionLabel = buildTaskSectionLabel(task);
 
   return (
     <article className={styles.hero}>
@@ -265,11 +266,17 @@ export function DashboardTodayCard({
           <div className={styles.metaLabel}>Формат</div>
           <div className={styles.metaValue}>{buildTaskKindLabel(task)}</div>
         </div>
+        {sectionLabel ? (
+          <div className={styles.metaChip}>
+            <div className={styles.metaLabel}>Раздел</div>
+            <div className={styles.metaValue}>{sectionLabel}</div>
+          </div>
+        ) : null}
         <div className={styles.metaChip}>
           <div className={styles.metaLabel}>
-            {task.task_type === "osce" ? "Элементов" : "Вопросов"}
+            {task.task_type === "osce" ? "Состав" : "Вопросов"}
           </div>
-          <div className={styles.metaValue}>{task.questions_count}</div>
+          <div className={styles.metaValue}>{task.task_type === "osce" ? taskWorkloadLabel(task) : task.questions_count}</div>
         </div>
         <div className={styles.metaChip}>
           <div className={styles.metaLabel}>Дата</div>

@@ -158,6 +158,8 @@ export function DashboardProgressPanel({
   onFocusAction,
   onProtocolAction,
   isInitialState = false,
+  isInitialDiagnosticOnly = false,
+  initialDiagnosticPercent = null,
 }: {
   readiness: ReadinessSummary;
   hasCurrentTask: boolean;
@@ -168,16 +170,24 @@ export function DashboardProgressPanel({
   onFocusAction: () => void;
   onProtocolAction: () => void;
   isInitialState?: boolean;
+  isInitialDiagnosticOnly?: boolean;
+  initialDiagnosticPercent?: number | null;
 }) {
   const protocol = readiness.exam_protocol;
   const readinessPercent = Math.round(readiness.overall_readiness_percent);
-  const displayedReadinessPercent = isInitialState ? 0 : readinessPercent;
+  const displayedReadinessPercent = isInitialState
+    ? 0
+    : isInitialDiagnosticOnly && typeof initialDiagnosticPercent === "number"
+      ? Math.round(initialDiagnosticPercent)
+      : readinessPercent;
   const focusTrack =
     readiness.tracks.find((track) => track.key === readiness.recommended_focus_key) ??
     readiness.tracks[0] ??
     null;
   const focusDetail = isInitialState
     ? "Пока нет прохождений, поэтому система не делает выводы о слабых темах. Начни со стартовой диагностики."
+    : isInitialDiagnosticOnly
+      ? "Диагностика уже показала стартовый уровень. План построен по слабым темам, а учебная готовность начнет расти после занятий."
     : focusTrack?.detail ?? "Система выбрала ближайший учебный фокус по текущим результатам.";
   const confirmedStages = protocol.stages.filter((stage) => stage.status === "passed").length;
   const protocolPercent = Math.round((confirmedStages / Math.max(protocol.stages.length, 1)) * 100);
@@ -194,11 +204,13 @@ export function DashboardProgressPanel({
 
         <div className={styles.forecastGrid}>
           <div className={styles.forecastCopy}>
-            <span className={styles.eyebrow}>Учебная готовность</span>
+            <span className={styles.eyebrow}>{isInitialDiagnosticOnly ? "Стартовый уровень" : "Учебная готовность"}</span>
             <strong className={styles.readinessValue}>{displayedReadinessPercent}%</strong>
             <span className={styles.levelText}>
               {isInitialState
                 ? "Пока нет данных"
+                : isInitialDiagnosticOnly
+                  ? "План составлен"
                 : readinessPercent >= 85
                 ? "Хороший уровень"
                 : readinessPercent >= 70
@@ -217,7 +229,13 @@ export function DashboardProgressPanel({
 
           <div className={styles.focusBox}>
             <span className={styles.eyebrow}>Фокус сейчас</span>
-            <strong>{isInitialState ? "Стартовая диагностика" : readiness.recommended_focus_label}</strong>
+            <strong>
+              {isInitialState
+                ? "Стартовая диагностика"
+                : isInitialDiagnosticOnly
+                  ? "План по слабым темам"
+                  : readiness.recommended_focus_label}
+            </strong>
             <p aria-label={focusDetail} title={focusDetail}>{focusDetail}</p>
             <button className={styles.inlineAction} onClick={onFocusAction} type="button">
               {focusActionLabel}

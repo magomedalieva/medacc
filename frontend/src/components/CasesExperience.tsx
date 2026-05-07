@@ -96,6 +96,21 @@ function parseSlugList(value: string | null): string[] {
     .filter((item) => /^[a-z0-9][a-z0-9-]*$/.test(item));
 }
 
+function selectCaseByTopic(cases: CaseItem[], topicId: number | null, plannedTaskId: number | null) {
+  if (topicId === null) {
+    return null;
+  }
+
+  const topicCases = cases.filter((item) => item.topicId === topicId);
+
+  if (topicCases.length === 0) {
+    return null;
+  }
+
+  const stableIndex = plannedTaskId !== null ? Math.abs(plannedTaskId - 1) % topicCases.length : 0;
+  return topicCases[stableIndex];
+}
+
 function SearchIcon() {
   return (
     <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -392,6 +407,18 @@ function getCaseOptionText(option: string | { label: string; text: string }) {
   return typeof option === "string" ? option : option.text;
 }
 
+function getCaseOptionTextByLabel(
+  options: Array<string | { label: string; text: string }>,
+  label: string | null | undefined,
+) {
+  if (!label) {
+    return null;
+  }
+
+  const matchedOption = options.find((option, index) => getCaseOptionLabel(option, index) === label);
+  return matchedOption ? getCaseOptionText(matchedOption) : null;
+}
+
 function countCaseQuestions(caseItem: CaseItem) {
   return caseItem.stages.filter((stage) => stage.type === "question" && stage.questionId).length;
 }
@@ -423,12 +450,14 @@ export function CasesExperience() {
   const [caseExamRun, setCaseExamRun] = useState<CaseExamSimulationRun | null>(null);
   const [caseExamPreparing, setCaseExamPreparing] = useState(false);
   const [caseExamSummaryOpen, setCaseExamSummaryOpen] = useState(false);
+  const [caseExamReviewOpen, setCaseExamReviewOpen] = useState(false);
   const [caseActionLoadingSlug, setCaseActionLoadingSlug] = useState<string | null>(null);
   const [startModalOpen, setStartModalOpen] = useState(false);
   const [passageOpen, setPassageOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [caseReviewOpen, setCaseReviewOpen] = useState(false);
   const [patientDataOpen, setPatientDataOpen] = useState(false);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
 
   const timerRef = useRef<number | null>(null);
   const finishTimeoutRef = useRef<number | null>(null);
@@ -553,7 +582,7 @@ export function CasesExperience() {
     const matchedCase =
       assignedFirstCase ??
       cases.find((item) => item.slug === routedCaseSlug) ??
-      cases.find((item) => routedTopicId !== null && item.topicId === routedTopicId) ??
+      selectCaseByTopic(cases, routedTopicId, routedPlannedTaskId) ??
       (shouldAutostartFromRoute || shouldStartExamRunFromRoute ? cases[0] ?? null : null) ??
       null;
 
@@ -628,6 +657,7 @@ export function CasesExperience() {
     routedCaseSlugsKey,
     routedCaseSlug,
     routedMode,
+    routedPlannedTaskId,
     routedTopicId,
     searchParams,
     setSearchParams,
@@ -648,7 +678,7 @@ export function CasesExperience() {
   }, [notice]);
 
   useEffect(() => {
-    const shouldLock = startModalOpen || passageOpen || aiOpen;
+    const shouldLock = startModalOpen || passageOpen || aiOpen || closeConfirmOpen;
 
     if (!shouldLock) {
       return;
@@ -669,7 +699,7 @@ export function CasesExperience() {
       body.style.overflow = previousOverflow;
       body.style.paddingRight = previousPaddingRight;
     };
-  }, [aiOpen, passageOpen, startModalOpen]);
+  }, [aiOpen, closeConfirmOpen, passageOpen, startModalOpen]);
 
   useEffect(() => {
     return () => {
@@ -826,6 +856,7 @@ export function CasesExperience() {
       }
 
       setCaseExamSummaryOpen(false);
+      setCaseExamReviewOpen(false);
       setCaseExamRun({
         cases: simulationCases,
         index: 0,
@@ -930,10 +961,12 @@ export function CasesExperience() {
     activeCaseAttemptRef.current = null;
     completionReportedRef.current = false;
     setCaseExamRun(null);
+    setCaseExamReviewOpen(false);
     setPassageOpen(false);
     setAiOpen(false);
     setCaseReviewOpen(false);
     setPatientDataOpen(false);
+    setCloseConfirmOpen(false);
     setPassageDurationSeconds(0);
     setCompletionResult(null);
     setCompletionReporting(false);
@@ -941,6 +974,15 @@ export function CasesExperience() {
     if (isStrictCaseRun) {
       returnToAccreditationCenter();
     }
+  }
+
+  function requestClosePassage() {
+    if (!isStrictCaseRun && completionResult === null) {
+      setCloseConfirmOpen(true);
+      return;
+    }
+
+    closePassage();
   }
 
   function showAiResult() {
@@ -1022,6 +1064,7 @@ export function CasesExperience() {
       results: nextResults,
       finished: true,
     });
+    setCaseExamReviewOpen(false);
     setCaseExamSummaryOpen(true);
   }
 
@@ -1044,6 +1087,7 @@ export function CasesExperience() {
 
   function closeCaseExamSummary() {
     setCaseExamSummaryOpen(false);
+    setCaseExamReviewOpen(false);
     setCaseExamRun(null);
 
     if (isStrictCaseRun) {
@@ -1586,7 +1630,7 @@ export function CasesExperience() {
             <span data-testid="cases-passage-timer-value">{timerDisplay}</span>
           </div>
 
-          <button className={styles["passage-close"]} onClick={closePassage} type="button">
+          <button className={styles["passage-close"]} onClick={requestClosePassage} type="button">
             <CloseIcon size={16} />
           </button>
         </div>
@@ -1685,6 +1729,38 @@ export function CasesExperience() {
       </div>
 
       <div
+        className={`${styles["modal-ov"]} ${closeConfirmOpen ? styles.active : ""}`.trim()}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) {
+            setCloseConfirmOpen(false);
+          }
+        }}
+        role="presentation"
+      >
+        {closeConfirmOpen ? (
+          <div className={`${styles.modal} ${styles["confirm-modal"]}`.trim()}>
+            <div className={styles["confirm-body"]}>
+              <div className={styles["confirm-icon"]}>
+                <InfoIcon />
+              </div>
+              <div className={styles["confirm-title"]}>Завершить сейчас?</div>
+              <p className={styles["confirm-desc"]}>
+                Незавершённый кейс не сохранится. Ответы, таймер и текущий прогресс будут потеряны.
+              </p>
+              <div className={styles["confirm-actions"]}>
+                <button className={`${styles.btn} ${styles["btn-o"]}`.trim()} onClick={() => setCloseConfirmOpen(false)} type="button">
+                  Продолжить
+                </button>
+                <button className={`${styles.btn} ${styles["btn-danger"]}`.trim()} onClick={closePassage} type="button">
+                  Да, завершить
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div
         className={`${styles["modal-ov"]} ${patientDataOpen ? styles.active : ""}`.trim()}
         onClick={(event) => {
           if (event.target === event.currentTarget) {
@@ -1733,7 +1809,7 @@ export function CasesExperience() {
         }}
         role="presentation"
       >
-        <div className={`${styles["ai-card"]} ${styles["result-card"]}`.trim()}>
+        <div className={`${styles["ai-card"]} ${caseExamReviewOpen ? styles["stage-review-card"] : styles["result-card"]}`.trim()}>
           <div className={styles["ai-head"]}>
             <div className={styles["ai-heading"]}>
               <div className={styles["ai-kicker"]}>Пробная аккредитация</div>
@@ -1745,96 +1821,172 @@ export function CasesExperience() {
           </div>
 
           <div className={styles["ai-body"]}>
-            <div className={styles["result-summary"]}>
-              <div className={styles["result-ring-wrap"]}>
-                <svg height="138" viewBox="0 0 138 138" width="138">
-                  <circle cx="69" cy="69" fill="none" r="58" stroke="var(--rule)" strokeWidth="9" />
-                  <circle
-                    cx="69"
-                    cy="69"
-                    r="58"
-                    fill="none"
-                    stroke={caseExamPassed ? "var(--green)" : "var(--accent)"}
-                    strokeDasharray={caseRingCircumference}
-                    strokeDashoffset={caseExamRingOffset}
-                    strokeLinecap="round"
-                    strokeWidth="9"
-                    transform="rotate(-90 69 69)"
-                  />
-                </svg>
-                <div className={styles["result-ring-inner"]}>
-                  <div className={styles["result-ring-value"]}>{caseExamPercent}%</div>
-                  <div className={styles["result-ring-label"]}>Итог</div>
-                </div>
-              </div>
-
-              <div className={styles["result-title"]}>{caseExamPassed ? "Ситуационные задачи сданы!" : "Этап требует повторения"}</div>
-              <div className={styles["result-desc"]}>
-                {caseExamPassed
-                  ? "Порог 70% пройден. Результат этапа пробной аккредитации сохранён."
-                  : "Для зачёта нужны оба назначенных кейса, минимум 24 вопроса и 70%+ в каждом кейсе."}
-              </div>
-
-              <div className={styles["result-stats"]}>
-                <div className={styles["result-stat"]}>
-                  <div className={styles["result-stat-value"]}>
-                    {caseExamCorrect}/{caseExamTotal}
+            {!caseExamReviewOpen ? (
+              <>
+                <div className={styles["result-summary"]}>
+                  <div className={styles["result-ring-wrap"]}>
+                    <svg height="138" viewBox="0 0 138 138" width="138">
+                      <circle cx="69" cy="69" fill="none" r="58" stroke="var(--rule)" strokeWidth="9" />
+                      <circle
+                        cx="69"
+                        cy="69"
+                        r="58"
+                        fill="none"
+                        stroke={caseExamPassed ? "var(--green)" : "var(--accent)"}
+                        strokeDasharray={caseRingCircumference}
+                        strokeDashoffset={caseExamRingOffset}
+                        strokeLinecap="round"
+                        strokeWidth="9"
+                        transform="rotate(-90 69 69)"
+                      />
+                    </svg>
+                    <div className={styles["result-ring-inner"]}>
+                      <div className={styles["result-ring-value"]}>{caseExamPercent}%</div>
+                      <div className={styles["result-ring-label"]}>Итог</div>
+                    </div>
                   </div>
-                  <div className={styles["result-stat-label"]}>Ответы</div>
-                </div>
-                <div className={styles["result-stat-divider"]} />
-                <div className={styles["result-stat"]}>
-                  <div className={styles["result-stat-value"]}>{caseExamResults.length}</div>
-                  <div className={styles["result-stat-label"]}>Кейсы</div>
-                </div>
-              </div>
-            </div>
 
-            <div className={styles["ai-score"]}>
-              <svg className={styles["ai-ring"]} viewBox="0 0 72 72">
-                <circle cx="36" cy="36" r="30" fill="none" stroke="var(--ink-10)" strokeWidth="6" />
-                <circle
-                  cx="36"
-                  cy="36"
-                  r="30"
-                  fill="none"
-                  stroke={caseExamPassed ? "var(--green)" : "var(--accent)"}
-                  strokeWidth="6"
-                  strokeDasharray={`${(caseExamPercent / 100) * 2 * Math.PI * 30} ${2 * Math.PI * 30}`}
-                  strokeLinecap="round"
-                  transform="rotate(-90 36 36)"
-                />
-              </svg>
+                  <div className={styles["result-title"]}>{caseExamPassed ? "Ситуационные задачи сданы!" : "Этап требует повторения"}</div>
+                  <div className={styles["result-desc"]}>
+                    {caseExamPassed
+                      ? "Порог 70% пройден. Результат этапа пробной аккредитации сохранён."
+                      : "Для зачёта нужны оба назначенных кейса, минимум 24 вопроса и 70%+ в каждом кейсе."}
+                  </div>
 
-              <div className={styles["ai-score-info"]}>
-                <div className={styles["ai-score-title"]}>{caseExamStatusLabel}</div>
-                <div className={styles["ai-score-sub"]}>
-                  {caseExamCorrect} из {caseExamTotal} верных · Итог {caseExamPercent}%
+                  <div className={styles["result-stats"]}>
+                    <div className={styles["result-stat"]}>
+                      <div className={styles["result-stat-value"]}>
+                        {caseExamCorrect}/{caseExamTotal}
+                      </div>
+                      <div className={styles["result-stat-label"]}>Ответы</div>
+                    </div>
+                    <div className={styles["result-stat-divider"]} />
+                    <div className={styles["result-stat"]}>
+                      <div className={styles["result-stat-value"]}>{caseExamResults.length}</div>
+                      <div className={styles["result-stat-label"]}>Кейсы</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className={styles["ai-section"]}>
-              <div className={styles["ai-sec-title"]}>Кейсы этапа</div>
-              {caseExamResults.map((item, index) => (
-                <div
-                  className={`${styles["ai-feedback"]} ${
-                    item.result.accuracy_percent >= ACCREDITATION_PASS_PERCENT ? styles.good : styles.bad
-                  }`.trim()}
-                  key={item.caseItem.slug}
-                >
-                  <strong>
-                    Кейс {index + 1}: {item.caseItem.title}
-                  </strong>
-                  <br />
-                  {item.result.correct_answers} из {item.result.total_questions} верных · {Math.round(item.result.accuracy_percent)}%
+                <div className={styles["ai-score"]}>
+                  <svg className={styles["ai-ring"]} viewBox="0 0 72 72">
+                    <circle cx="36" cy="36" r="30" fill="none" stroke="var(--ink-10)" strokeWidth="6" />
+                    <circle
+                      cx="36"
+                      cy="36"
+                      r="30"
+                      fill="none"
+                      stroke={caseExamPassed ? "var(--green)" : "var(--accent)"}
+                      strokeWidth="6"
+                      strokeDasharray={`${(caseExamPercent / 100) * 2 * Math.PI * 30} ${2 * Math.PI * 30}`}
+                      strokeLinecap="round"
+                      transform="rotate(-90 36 36)"
+                    />
+                  </svg>
+
+                  <div className={styles["ai-score-info"]}>
+                    <div className={styles["ai-score-title"]}>{caseExamStatusLabel}</div>
+                    <div className={styles["ai-score-sub"]}>
+                      {caseExamCorrect} из {caseExamTotal} верных · Итог {caseExamPercent}%
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
+
+                <div className={styles["ai-section"]}>
+                  <div className={styles["ai-sec-title"]}>Кейсы этапа</div>
+                  {caseExamResults.map((item, index) => (
+                    <div
+                      className={`${styles["ai-feedback"]} ${
+                        item.result.accuracy_percent >= ACCREDITATION_PASS_PERCENT ? styles.good : styles.bad
+                      }`.trim()}
+                      key={item.caseItem.slug}
+                    >
+                      <strong>
+                        Кейс {index + 1}: {item.caseItem.title}
+                      </strong>
+                      <br />
+                      {item.result.correct_answers} из {item.result.total_questions} верных · {Math.round(item.result.accuracy_percent)}%
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles["stage-review-summary"]}>
+                  <strong>Полный разбор кейсового этапа</strong>
+                  <span>
+                    {caseExamCorrect} из {caseExamTotal} верных · итог {caseExamPercent}% · {caseExamStatusLabel}
+                  </span>
+                </div>
+
+                <div className={styles["stage-review-list"]}>
+                  {caseExamResults.map((item, index) => {
+                    const feedbackByQuestionId = new Map(item.result.feedback.map((feedback) => [feedback.question_id, feedback] as const));
+                    const questionStages = item.caseItem.stages.filter((stage): stage is CaseStageQuestion => stage.type === "question");
+
+                    return (
+                      <section className={styles["stage-review-group"]} key={item.caseItem.slug}>
+                        <div className={styles["stage-review-head"]}>
+                          <div>
+                            <div className={styles["stage-review-kicker"]}>Кейс {index + 1}</div>
+                            <h3>{item.caseItem.title}</h3>
+                          </div>
+                          <span
+                            className={`${styles["stage-review-score"]} ${
+                              item.result.accuracy_percent >= ACCREDITATION_PASS_PERCENT ? styles.good : styles.bad
+                            }`.trim()}
+                          >
+                            {Math.round(item.result.accuracy_percent)}%
+                          </span>
+                        </div>
+
+                        {questionStages.map((stage) => {
+                          const feedback = stage.questionId ? feedbackByQuestionId.get(stage.questionId) : undefined;
+                          const selectedText = getCaseOptionTextByLabel(stage.options, feedback?.selected_option_label);
+                          const correctText = getCaseOptionTextByLabel(stage.options, feedback?.correct_option_label);
+
+                          return (
+                            <div
+                              className={`${styles["stage-review-item"]} ${
+                                feedback?.is_correct ? styles.good : styles.bad
+                              }`.trim()}
+                              key={stage.questionId ?? stage.title}
+                            >
+                              <div className={styles["stage-review-question"]}>{stage.question}</div>
+                              <div className={styles["stage-review-answer"]}>
+                                <strong>Ваш ответ:</strong>{" "}
+                                {feedback?.selected_option_label ?? "Не отвечено"}
+                                {selectedText ? ` — ${selectedText}` : ""}
+                              </div>
+                              {feedback && !feedback.is_correct ? (
+                                <div className={styles["stage-review-answer"]}>
+                                  <strong>Правильно:</strong> {feedback.correct_option_label}
+                                  {correctText ? ` — ${correctText}` : ""}
+                                </div>
+                              ) : null}
+                              <p>{feedback?.explanation ?? stage.explanation ?? "Разбор по вопросу не найден."}</p>
+                            </div>
+                          );
+                        })}
+                      </section>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
 
           <div className={styles["ai-acts"]}>
-            <button className={`${styles.btn} ${styles["btn-p"]}`.trim()} onClick={closeCaseExamSummary} type="button">
+            {caseExamReviewOpen ? (
+              <button className={`${styles.btn} ${styles["btn-o"]}`.trim()} onClick={() => setCaseExamReviewOpen(false)} type="button">
+                К результату
+              </button>
+            ) : (
+              <button className={`${styles.btn} ${styles["btn-p"]}`.trim()} onClick={() => setCaseExamReviewOpen(true)} type="button">
+                Посмотреть разбор
+              </button>
+            )}
+            <button className={`${styles.btn} ${caseExamReviewOpen ? styles["btn-p"] : styles["btn-o"]}`.trim()} onClick={closeCaseExamSummary} type="button">
               {isStrictCaseRun ? "В аккредитацию" : "Закрыть"}
             </button>
           </div>
