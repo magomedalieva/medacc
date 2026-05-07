@@ -827,7 +827,12 @@ export function SchedulePage() {
             </strong>
           </span>
         </div>
-        <button className={cx(styles["status-cell"], styles["mode-cell"])} onClick={() => setPreferencesModalOpen(true)} type="button">
+        <button
+          className={cx(styles["status-cell"], styles["mode-cell"])}
+          data-testid="schedule-open-preferences"
+          onClick={() => setPreferencesModalOpen(true)}
+          type="button"
+        >
           <span className={styles["mode-icon"]}>
             <GearIcon />
           </span>
@@ -1169,7 +1174,10 @@ export function SchedulePage() {
                     <div className={styles["prefs-time-grid"]}>
                       {dailyMinuteOptions.map((option) => (
                         <button
+                          aria-pressed={String(option.value) === dailyStudyMinutes}
                           className={cx(styles["prefs-time-pill"], String(option.value) === dailyStudyMinutes && styles.on)}
+                          data-minute-value={option.value}
+                          data-testid={`schedule-daily-minutes-${option.value}`}
                           disabled={savingPreferences}
                           key={option.value}
                           onClick={() => setDailyStudyMinutes(String(option.value))}
@@ -1255,6 +1263,7 @@ export function SchedulePage() {
                   </button>
                   <button
                     className={styles.save}
+                    data-testid="schedule-save-preferences"
                     disabled={savingPreferences || !hasPreferenceChanges}
                     onClick={() => void handleSavePreferences()}
                     type="button"

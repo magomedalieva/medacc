@@ -523,18 +523,21 @@ test.describe("student smoke journeys", () => {
     await expect(page.getByTestId("schedule-page")).toBeVisible();
 
     await page.getByTestId("schedule-open-preferences").click();
-    const dailyMinutesSelect = page.getByLabel("Сколько времени в день").first();
-    const currentValue = await dailyMinutesSelect.inputValue();
-    const availableValues = await dailyMinutesSelect.locator("option").evaluateAll((options) =>
-      options.map((option) => (option as HTMLOptionElement).value),
+    const dailyMinuteButtons = page.locator('[data-testid^="schedule-daily-minutes-"]');
+    const currentValue = await page
+      .locator('[data-testid^="schedule-daily-minutes-"][aria-pressed="true"]')
+      .first()
+      .getAttribute("data-minute-value");
+    const availableValues = await dailyMinuteButtons.evaluateAll((buttons) =>
+      buttons.map((button) => button.getAttribute("data-minute-value")).filter((value): value is string => Boolean(value)),
     );
     const nextValue = availableValues.find((value) => value !== currentValue);
 
     expect(nextValue, "Schedule preferences should have at least two selectable daily minute options").toBeTruthy();
 
-    await dailyMinutesSelect.selectOption(nextValue!);
+    await page.getByTestId(`schedule-daily-minutes-${nextValue}`).click();
     await page.getByTestId("schedule-save-preferences").click();
-    await expect(page.getByText("Настройки обновлены", { exact: false })).toBeVisible();
+    await expect(page.getByText("Режим сохранён.", { exact: false })).toBeVisible();
 
     const api = await createAuthenticatedApi(page);
     await expect.poll(async () => (await getProfile(api)).daily_study_minutes).toBe(Number(nextValue));
@@ -542,7 +545,7 @@ test.describe("student smoke journeys", () => {
     await page.reload();
     await expect(page).toHaveURL(/\/app\/schedule$/);
     await page.getByTestId("schedule-open-preferences").click();
-    await expect(dailyMinutesSelect).toHaveValue(nextValue!);
+    await expect(page.getByTestId(`schedule-daily-minutes-${nextValue}`)).toHaveAttribute("aria-pressed", "true");
 
     await api.dispose();
   });
