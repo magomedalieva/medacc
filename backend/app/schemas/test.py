@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -33,6 +34,9 @@ class TestSessionResponse(BaseModel):
     total_questions: int
     current_index: int
     time_limit_minutes: int | None
+    started_at: datetime
+    finished_at: datetime | None = None
+    server_time: datetime
     questions: list[QuestionResponse]
     answers: list[TestSessionAnswerResultResponse] = Field(default_factory=list)
 
@@ -59,4 +63,7 @@ class TestSessionFinishResponse(BaseModel):
     answered_questions: int
     total_questions: int
     status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    server_time: datetime
     answers: list[TestSessionAnswerResultResponse] = Field(default_factory=list)

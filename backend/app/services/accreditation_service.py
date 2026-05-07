@@ -1,5 +1,7 @@
 import hashlib
+from itertools import combinations
 import json
+import random
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -54,9 +56,14 @@ class AccreditationService:
     ) -> ExamSimulationResponse:
         self._ensure_onboarding_completed(user)
         now = utc_now()
-        stage_details = await self._build_simulation_stage_details(user, assigned_at=now)
+        previous_simulations = await self.exam_simulation_repository.list_by_user(user.id)
+        stage_details = await self._build_simulation_stage_details(
+            user,
+            assigned_at=now,
+            previous_simulations=previous_simulations,
+        )
 
-        for active_simulation in await self.exam_simulation_repository.list_by_user(user.id):
+        for active_simulation in previous_simulations:
             if active_simulation.simulation_type == simulation_type and active_simulation.status == "active":
                 active_simulation.status = "cancelled"
                 active_simulation.finished_at = now
@@ -459,7 +466,12 @@ class AccreditationService:
         finished_values = [stage.finished_at for stage in final_stages if stage is not None and stage.finished_at is not None]
         simulation.finished_at = max(finished_values) if finished_values else utc_now()
 
-    async def _build_simulation_stage_details(self, user: User, assigned_at: datetime) -> dict[str, dict]:
+    async def _build_simulation_stage_details(
+        self,
+        user: User,
+        assigned_at: datetime,
+        previous_simulations: list[ExamSimulation] | None = None,
+    ) -> dict[str, dict]:
         faculty_code = await self._resolve_faculty_code(user)
         active_question_count = await self.question_repository.count_filtered(
             faculty_id=user.faculty_id,
@@ -473,8 +485,18 @@ class AccreditationService:
                 f"по факультету. Сейчас доступно {active_question_count}."
             )
 
-        case_details = await self._build_case_stage_assignment(faculty_code, assigned_at=assigned_at)
-        osce_details = await self._build_osce_stage_assignment(faculty_code, assigned_at=assigned_at)
+        case_details = await self._build_case_stage_assignment(
+            faculty_code,
+            assigned_at=assigned_at,
+            user_id=user.id,
+            previous_simulations=previous_simulations or [],
+        )
+        osce_details = await self._build_osce_stage_assignment(
+            faculty_code,
+            assigned_at=assigned_at,
+            user_id=user.id,
+            previous_simulations=previous_simulations or [],
+        )
         test_snapshot = {
             "question_assignment": "frozen_on_test_session_start",
             "assigned_question_count": FULL_EXAM_QUESTION_COUNT,
@@ -495,14 +517,32 @@ class AccreditationService:
             "osce": osce_details,
         }
 
-    async def _build_case_stage_assignment(self, faculty_code: str | None, assigned_at: datetime) -> dict:
+    async def _build_case_stage_assignment(
+        self,
+        faculty_code: str | None,
+        assigned_at: datetime,
+        user_id: int,
+        previous_simulations: list[ExamSimulation],
+    ) -> dict:
         available_cases = [
             clinical_case
             for clinical_case in await self.case_repository.list_cases()
             if self._is_accessible_for_faculty(clinical_case.faculty_codes, faculty_code)
             and len(clinical_case.quiz_questions) > 0
         ]
-        selected_cases = available_cases[:CASE_STAGE_CASE_COUNT]
+        selected_cases = self._select_stage_materials(
+            available_cases,
+            count=CASE_STAGE_CASE_COUNT,
+            minimum_total_questions=CASE_STAGE_TOTAL_QUESTIONS,
+            user_id=user_id,
+            stage_key="cases",
+            assigned_at=assigned_at,
+            recently_assigned_slugs=self._latest_assigned_slugs(
+                previous_simulations,
+                stage_key="cases",
+                detail_key="assigned_case_slugs",
+            ),
+        )
         total_questions = sum(len(clinical_case.quiz_questions) for clinical_case in selected_cases)
 
         if len(selected_cases) < CASE_STAGE_CASE_COUNT or total_questions < CASE_STAGE_TOTAL_QUESTIONS:
@@ -529,7 +569,13 @@ class AccreditationService:
             "requirement": "2_cases_24_questions_70_percent",
         }
 
-    async def _build_osce_stage_assignment(self, faculty_code: str | None, assigned_at: datetime) -> dict:
+    async def _build_osce_stage_assignment(
+        self,
+        faculty_code: str | None,
+        assigned_at: datetime,
+        user_id: int,
+        previous_simulations: list[ExamSimulation],
+    ) -> dict:
         available_stations = [
             station
             for station in await self.osce_station_repository.list_stations()
@@ -537,7 +583,18 @@ class AccreditationService:
             and len(station.checklist_items) > 0
             and len(station.quiz_questions) > 0
         ]
-        selected_stations = available_stations[:OSCE_STAGE_STATION_COUNT]
+        selected_stations = self._select_stage_materials(
+            available_stations,
+            count=OSCE_STAGE_STATION_COUNT,
+            user_id=user_id,
+            stage_key="osce",
+            assigned_at=assigned_at,
+            recently_assigned_slugs=self._latest_assigned_slugs(
+                previous_simulations,
+                stage_key="osce",
+                detail_key="assigned_station_slugs",
+            ),
+        )
 
         if len(selected_stations) < OSCE_STAGE_STATION_COUNT:
             raise BadRequestError(
@@ -602,6 +659,79 @@ class AccreditationService:
             **snapshot,
             "snapshot_hash": self._snapshot_signature(snapshot),
         }
+
+    def _select_stage_materials(
+        self,
+        materials: list,
+        *,
+        count: int,
+        minimum_total_questions: int | None = None,
+        user_id: int,
+        stage_key: str,
+        assigned_at: datetime,
+        recently_assigned_slugs: set[str],
+    ) -> list:
+        shuffled = list(materials)
+        rng = random.Random(self._assignment_seed(user_id, stage_key, assigned_at, [item.slug for item in shuffled]))
+        rng.shuffle(shuffled)
+
+        fresh = [item for item in shuffled if item.slug not in recently_assigned_slugs]
+        repeated = [item for item in shuffled if item.slug in recently_assigned_slugs]
+        ordered_materials = fresh + repeated
+
+        candidate_pools = [fresh, ordered_materials] if len(fresh) >= count else [ordered_materials]
+
+        if minimum_total_questions is not None:
+            for candidate_pool in candidate_pools:
+                for candidate_group in combinations(candidate_pool, count):
+                    total_questions = sum(len(getattr(item, "quiz_questions", [])) for item in candidate_group)
+
+                    if total_questions >= minimum_total_questions:
+                        return list(candidate_group)
+
+        for candidate_pool in candidate_pools:
+            if len(candidate_pool) >= count:
+                return candidate_pool[:count]
+
+        if minimum_total_questions is not None:
+            for candidate_group in combinations(ordered_materials, count):
+                total_questions = sum(len(getattr(item, "quiz_questions", [])) for item in candidate_group)
+
+                if total_questions >= minimum_total_questions:
+                    return list(candidate_group)
+
+        return ordered_materials[:count]
+
+    @staticmethod
+    def _assignment_seed(user_id: int, stage_key: str, assigned_at: datetime, slugs: list[str]) -> int:
+        payload = json.dumps(
+            {
+                "user_id": user_id,
+                "stage_key": stage_key,
+                "assigned_at": assigned_at.isoformat(),
+                "slugs": sorted(slugs),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return int(hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16], 16)
+
+    def _latest_assigned_slugs(
+        self,
+        simulations: list[ExamSimulation],
+        *,
+        stage_key: str,
+        detail_key: str,
+    ) -> set[str]:
+        for simulation in simulations:
+            stage = self._build_stages_by_key(simulation).get(stage_key)
+            assigned_slugs = self._assigned_slugs(stage, detail_key)
+
+            if assigned_slugs:
+                return set(assigned_slugs)
+
+        return set()
 
     def _test_scoring_rules(self) -> dict:
         return {

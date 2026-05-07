@@ -793,7 +793,7 @@ export function SchedulePage() {
   }, [historyModalOpen, preferencesModalOpen]);
 
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} data-testid="schedule-page">
       <header className={styles.ph}>
         <div>
           <div className={styles["ph-kicker"]}>Первичная аккредитация</div>
@@ -957,6 +957,7 @@ export function SchedulePage() {
                       styles[`tone-${taskTone(task)}`],
                       !isTaskActive(task) && styles.muted,
                     )}
+                    data-testid={`schedule-task-${task.id}`}
                     disabled={!isTaskActive(task)}
                     key={task.id}
                     onClick={() => void handleStart(task)}
@@ -988,6 +989,7 @@ export function SchedulePage() {
             <div className={styles["day-actions"]}>
               <button
                 className={styles.primary}
+                data-testid={selectedPrimaryTask ? `schedule-task-start-${selectedPrimaryTask.id}` : undefined}
                 disabled={
                   !selectedPrimaryTask ||
                   !canStartTask(selectedPrimaryTask, serverToday, activeStudyWeekdays, todayHasStudyTime) ||

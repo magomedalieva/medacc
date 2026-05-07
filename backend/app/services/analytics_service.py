@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.clock import today, utc_now
 from app.core.exceptions import NotFoundError
 from app.models.user import User
-from app.repositories.analytics_repository import AnalyticsRepository, CaseAttemptMetrics
+from app.repositories.analytics_repository import AnalyticsRepository
 from app.repositories.clinical_case_attempt_repository import ClinicalCaseAttemptRepository
 from app.repositories.clinical_case_repository import ClinicalCaseRepository
 from app.repositories.faculty_repository import FacultyRepository
@@ -20,7 +20,6 @@ from app.schemas.analytics import (
     ClinicalCaseAttemptReviewItemResponse,
     DailyAnalyticsResponse,
     ExamReadinessProtocolResponse,
-    ExamStageProtocolResponse,
     OsceStationChecklistGapAnalyticsResponse,
     OsceStationQuizMistakeAnalyticsResponse,
     OsceStationReviewAnalyticsResponse,
@@ -39,13 +38,11 @@ from app.services.readiness_engine import (
 )
 
 
-WEAK_THRESHOLD = 60.0
-MEDIUM_THRESHOLD = 80.0
+TRAINING_PASS_PERCENT = 70.0
+TRAINING_MASTERY_PERCENT = 85.0
+WEAK_THRESHOLD = TRAINING_PASS_PERCENT
+MEDIUM_THRESHOLD = TRAINING_MASTERY_PERCENT
 ACCREDITATION_PASS_PERCENT = 70.0
-FULL_EXAM_QUESTION_COUNT = 80
-CASE_EXAM_CASE_COUNT = 2
-CASE_EXAM_TOTAL_QUESTIONS = 24
-OSCE_EXAM_STATION_COUNT = 5
 HISTORY_LIMIT_DAYS = 30
 RECENT_CASE_ATTEMPTS_LIMIT = 40
 REPEATING_QUESTION_ERRORS_LIMIT = 8
@@ -466,7 +463,7 @@ class AnalyticsService:
             if item.answered_questions > 0:
                 covered_topics_count += 1
 
-                if accuracy >= 75.0:
+                if accuracy >= TRAINING_MASTERY_PERCENT:
                     stable_topics_count += 1
 
                 if accuracy < 55.0:
@@ -555,136 +552,6 @@ class AnalyticsService:
                 for item in summary.tracks
             ],
             exam_protocol=exam_protocol,
-        )
-
-    def _build_exam_protocol(
-        self,
-        *,
-        readiness_metrics,
-        recent_case_attempts: list[CaseAttemptMetrics],
-        osce_station_count: int,
-        osce_passed_stations_count: int,
-    ) -> ExamReadinessProtocolResponse:
-        stages = [
-            self._build_test_exam_stage(readiness_metrics),
-            self._build_case_exam_stage(recent_case_attempts),
-            self._build_osce_exam_stage(osce_station_count, osce_passed_stations_count),
-        ]
-        failed_or_unconfirmed = [stage for stage in stages if stage.status != "passed"]
-        action_items = [stage.detail for stage in failed_or_unconfirmed]
-        failed_stages = [stage for stage in failed_or_unconfirmed if stage.status == "failed"]
-
-        if failed_or_unconfirmed:
-            return ExamReadinessProtocolResponse(
-                overall_status="not_ready",
-                overall_status_label="Пробная аккредитация не сдана" if failed_stages else "Пробная аккредитация не начата",
-                summary="Учебная готовность не равна зачёту: нужно закрыть все три этапа по строгим условиям.",
-                stages=stages,
-                action_items=action_items[:4],
-            )
-
-        return ExamReadinessProtocolResponse(
-            overall_status="ready",
-            overall_status_label="Протокол подтвержден",
-            summary="Все три этапа подтверждены по экзаменационному порогу 70%+.",
-            stages=stages,
-            action_items=[],
-        )
-
-    def _build_test_exam_stage(self, readiness_metrics) -> ExamStageProtocolResponse:
-        full_exam_attempts_count = int(getattr(readiness_metrics, "full_exam_attempts_count", 0) or 0)
-        latest_score = getattr(readiness_metrics, "latest_full_exam_score", None)
-
-        if full_exam_attempts_count <= 0 or latest_score is None:
-            return ExamStageProtocolResponse(
-                key="tests",
-                label="Тестовый этап",
-                status="unconfirmed",
-                status_label="Не начат",
-                result_label="Нет пробника 80 вопросов",
-                requirement_label="80 вопросов, 70%+",
-                detail="Пройти полный тестовый пробник на 80 вопросов и набрать не меньше 70%.",
-            )
-
-        passed = latest_score >= ACCREDITATION_PASS_PERCENT
-        return ExamStageProtocolResponse(
-            key="tests",
-            label="Тестовый этап",
-            status="passed" if passed else "failed",
-            status_label="Сдан" if passed else "Не сдан",
-            result_label=f"{round(latest_score)}%",
-            requirement_label="80 вопросов, 70%+",
-            detail=(
-                "Тестовый этап подтвержден свежим полным пробником."
-                if passed
-                else "Повторить полный пробник на 80 вопросов до результата 70%+."
-            ),
-        )
-
-    def _build_case_exam_stage(
-        self,
-        recent_case_attempts: list[CaseAttemptMetrics],
-    ) -> ExamStageProtocolResponse:
-        if len(recent_case_attempts) < CASE_EXAM_CASE_COUNT:
-            return ExamStageProtocolResponse(
-                key="cases",
-                label="Ситуационные задачи",
-                status="unconfirmed",
-                status_label="Не начат",
-                result_label=f"{len(recent_case_attempts)}/2 задачи",
-                requirement_label="2 задачи, 24 вопроса, 70%+",
-                detail="Пройти полный этап из 2 ситуационных задач.",
-            )
-
-        latest_two = recent_case_attempts[:CASE_EXAM_CASE_COUNT]
-        total_questions = sum(item.answered_questions for item in latest_two)
-        correct_answers = sum(item.correct_answers for item in latest_two)
-        accuracy = self._calculate_accuracy(correct_answers, total_questions)
-        passed = total_questions >= CASE_EXAM_TOTAL_QUESTIONS and accuracy >= ACCREDITATION_PASS_PERCENT
-
-        return ExamStageProtocolResponse(
-            key="cases",
-            label="Ситуационные задачи",
-            status="passed" if passed else "failed",
-            status_label="Сданы" if passed else "Не сданы",
-            result_label=f"{correct_answers}/{total_questions} · {round(accuracy)}%",
-            requirement_label="2 задачи, 24 вопроса, 70%+",
-            detail=(
-                "Этап ситуационных задач подтвержден двумя последними задачами."
-                if passed
-                else "Пройти 2 ситуационные задачи подряд и набрать суммарно 70%+."
-            ),
-        )
-
-    def _build_osce_exam_stage(
-        self,
-        osce_station_count: int,
-        osce_passed_stations_count: int,
-    ) -> ExamStageProtocolResponse:
-        if osce_station_count <= 0:
-            return ExamStageProtocolResponse(
-                key="osce",
-                label="Практический этап / ОСКЭ",
-                status="unconfirmed",
-                status_label="Не начат",
-                result_label="Нет станций",
-                requirement_label="5 станций, каждая 70%+",
-                detail="Добавить и пройти станции ОСКЭ для выбранной специальности.",
-            )
-
-        passed = osce_passed_stations_count >= OSCE_EXAM_STATION_COUNT
-        return ExamStageProtocolResponse(
-            key="osce",
-            label="Практический этап / ОСКЭ",
-            status="passed" if passed else "failed",
-            status_label="Сдан" if passed else "Не сдан",
-            result_label=f"{osce_passed_stations_count}/{OSCE_EXAM_STATION_COUNT} станций",
-            requirement_label="5 станций, каждая 70%+",
-            detail=(
-                "Практический этап подтвержден: не меньше 5 станций закрыты на 70%+."
-                if passed
-                else "Закрыть не меньше 5 станций ОСКЭ на 70%+ каждую."
-            ),
         )
 
     def _calculate_accuracy(self, correct_answers: int, answered_questions: int) -> float:

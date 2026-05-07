@@ -849,6 +849,10 @@
   overflow: hidden;
 }
 
+.patient-data-modal {
+  max-width: 640px;
+}
+
 .modal-hd {
   padding: 22px 24px 18px;
   border-bottom: 1px solid var(--rule);
@@ -861,6 +865,16 @@
   font-family: var(--fs);
   font-size: 22px;
   font-weight: 400;
+}
+
+.modal-kicker {
+  font-family: var(--fm);
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  color: var(--ink-40);
+  margin-bottom: 4px;
 }
 
 .modal-x {
@@ -892,6 +906,11 @@
 
 .modal-bd {
   padding: 22px 24px;
+}
+
+.patient-data-content {
+  max-height: 58vh;
+  overflow-y: auto;
 }
 
 .modal-desc {
@@ -1244,6 +1263,46 @@
   border: 1px solid var(--rule);
 }
 
+.q-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+}
+
+.patient-data-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 3px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink-70);
+  font-family: var(--fm);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition:
+    background 160ms,
+    border-color 160ms,
+    color 160ms;
+}
+
+.patient-data-btn svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.patient-data-btn:hover {
+  background: var(--ink-07);
+  border-color: var(--ink-15);
+  color: var(--ink);
+}
+
 .qtext {
   font-size: 14px;
   font-weight: 600;
@@ -1383,7 +1442,7 @@
   inset: 0;
   z-index: 250;
   background: rgba(12, 12, 12, 0.5);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(18px);
   display: none;
   align-items: center;
   justify-content: center;
@@ -1397,15 +1456,151 @@
 .ai-card {
   background: var(--surface);
   border: 1px solid var(--rule);
-  border-radius: 6px;
+  border-radius: 8px;
   width: 100%;
   max-width: 560px;
-  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 32px 100px rgba(0, 0, 0, 0.26);
   animation: slideUp 300ms var(--ease);
   overflow: hidden;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
+}
+
+.result-card {
+  max-width: 460px;
+}
+
+.result-card .ai-head,
+.result-card .ai-score {
+  display: none;
+}
+
+.result-card .ai-body {
+  padding: 0;
+  overflow: visible;
+}
+
+.result-summary {
+  padding: 40px 28px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.result-primary {
+  width: 100%;
+}
+
+.result-ring-wrap {
+  position: relative;
+  width: 138px;
+  height: 138px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.result-ring-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.result-ring-value {
+  font-family: var(--fs);
+  font-size: 42px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.result-ring-label {
+  margin-top: 5px;
+  font-family: var(--fm);
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: var(--ink-40);
+}
+
+.result-title {
+  font-family: var(--fs);
+  font-size: 28px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.result-desc {
+  max-width: 320px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--ink-70);
+}
+
+.result-stats {
+  width: 100%;
+  display: flex;
+  justify-content: space-around;
+  padding: 14px 22px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--paper);
+}
+
+.result-stat {
+  flex: 1;
+  text-align: center;
+}
+
+.result-stat-value {
+  font-family: var(--fs);
+  font-size: 24px;
+  line-height: 1;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.result-stat-label {
+  font-family: var(--fm);
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-40);
+}
+
+.result-stat-divider {
+  width: 1px;
+  background: var(--rule);
+}
+
+.case-review-page {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.review-page-head {
+  padding: 28px 28px 20px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+}
+
+.review-page-sub {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-70);
 }
 
 .ai-head {
@@ -1555,6 +1750,19 @@
 }
 
 .ai-acts .btn-p {
+  flex: 1;
+}
+
+.case-review-actions {
+  display: flex;
+  gap: 10px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+}
+
+.case-review-actions .btn {
   flex: 1;
 }
 

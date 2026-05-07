@@ -30,6 +30,10 @@ function isNavigationActive(pathname: string, target: (typeof studentNavigation)
     return pathname === target || pathname.startsWith("/app/osce/");
   }
 
+  if (target === "/app/accreditation") {
+    return pathname === target || pathname.startsWith("/app/accreditation/");
+  }
+
   return pathname === target;
 }
 

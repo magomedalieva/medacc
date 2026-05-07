@@ -167,10 +167,14 @@ function ensureAdminAccount(credentials: AdminCredentials) {
 
 async function loginUser(page: Page, credentials: AdminCredentials) {
   await page.goto("/auth");
+  await page.getByRole("button", { name: "MedAcc" }).click();
+  await expect(page.getByRole("tab", { name: "Вход" })).toHaveAttribute("aria-selected", "true");
   await page.getByLabel("Электронная почта").fill(credentials.email);
-  await page.getByLabel("Пароль").fill(credentials.password);
+  await page.getByLabel("Пароль", { exact: true }).fill(credentials.password);
   await page.getByRole("button", { name: "Войти" }).click();
-  await expect(page).toHaveURL(/\/staff\/questions$/);
+  await expect(page).toHaveURL(/\/staff\/(coverage|questions)$/);
+  await page.goto("/staff/questions");
+  await expect(page.getByTestId("admin-questions-page")).toBeVisible();
 }
 
 async function createAuthenticatedApi(page: Page) {

@@ -6,7 +6,11 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.clinical_case_quiz import CASE_QUIZ_QUESTION_COUNT, build_fallback_case_quiz_questions
+from app.core.clinical_case_quiz import (
+    CASE_QUIZ_QUESTION_COUNT,
+    build_fallback_case_quiz_questions,
+    enrich_case_quiz_question_hints,
+)
 from app.core.exceptions import BadRequestError, NotFoundError
 from app.models.clinical_case_attempt import ClinicalCaseAttempt
 from app.models.clinical_case import (
@@ -183,7 +187,7 @@ class ClinicalCaseRepository:
         questions = self._questions_from_records(record.quiz_questions or [])
 
         if len(questions) == CASE_QUIZ_QUESTION_COUNT:
-            return questions
+            return enrich_case_quiz_question_hints(questions)
 
         return build_fallback_case_quiz_questions(
             slug=record.slug,

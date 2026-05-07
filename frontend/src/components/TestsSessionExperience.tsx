@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../contexts/AuthContext";
 import { api, ApiError } from "../lib/api";
+import { buildAccreditationReturnRoute } from "../lib/session";
 import type { TestSession, TestSessionAnswerResponse, TestSessionFinishResponse } from "../types/api";
 import { TestsChrome } from "./TestsChrome";
 import styles from "./TestsExperience.module.css";
@@ -11,6 +12,9 @@ interface RecordedAnswer {
   selectedOptionLabel: string;
   response: TestSessionAnswerResponse;
 }
+
+const TRAINING_PASS_PERCENT = 70;
+const TRAINING_MASTERY_PERCENT = 85;
 
 function mapAnswerResults(results: TestSessionAnswerResponse[] = []): Record<number, RecordedAnswer> {
   return Object.fromEntries(
@@ -22,6 +26,39 @@ function mapAnswerResults(results: TestSessionAnswerResponse[] = []): Record<num
       },
     ]),
   );
+}
+
+function timestamp(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function sessionElapsedSeconds(session: TestSession) {
+  const startedAt = timestamp(session.started_at);
+  const finishedAt = timestamp(session.finished_at);
+  const serverNow = timestamp(session.server_time);
+  const effectiveNow = finishedAt ?? serverNow;
+
+  if (startedAt === null || effectiveNow === null) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor((effectiveNow - startedAt) / 1000));
+}
+
+function finishElapsedSeconds(result: TestSessionFinishResponse, fallbackSeconds: number) {
+  const startedAt = timestamp(result.started_at);
+  const finishedAt = timestamp(result.finished_at);
+
+  if (startedAt === null || finishedAt === null) {
+    return fallbackSeconds;
+  }
+
+  return Math.max(0, Math.floor((finishedAt - startedAt) / 1000));
 }
 
 function setRipplePosition(event: MouseEvent<HTMLElement>) {
@@ -238,8 +275,8 @@ function AnimatedRingValue({ value }: { value: number }) {
 }
 
 function ResultRing({ value, color }: { value: number; color: string }) {
-  const size = 140;
-  const radius = (size - 12) / 2;
+  const size = 138;
+  const radius = 58;
   const center = size / 2;
   const circumference = 2 * Math.PI * radius;
   const [dashArray, setDashArray] = useState(`0 ${circumference}`);
@@ -254,7 +291,7 @@ function ResultRing({ value, color }: { value: number; color: string }) {
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={center} cy={center} r={radius} fill="none" stroke="var(--ink-07)" strokeWidth="9" />
+      <circle cx={center} cy={center} r={radius} fill="none" stroke="var(--rule)" strokeWidth="9" />
       <circle
         cx={center}
         cy={center}
@@ -273,6 +310,7 @@ function ResultRing({ value, color }: { value: number; color: string }) {
 
 export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { token } = useAuth();
   const [session, setSession] = useState<TestSession | null>(null);
   const [finishResult, setFinishResult] = useState<TestSessionFinishResponse | null>(null);
@@ -286,6 +324,7 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
   const [finishing, setFinishing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedReviewQuestionId, setSelectedReviewQuestionId] = useState<number | null>(null);
+  const [resultReviewOpen, setResultReviewOpen] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const startedAtRef = useRef<number>(Date.now());
   const totalSecondsRef = useRef(0);
@@ -308,15 +347,17 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
         setCurrentIndex(Math.min(nextSession.current_index, Math.max(nextSession.questions.length - 1, 0)));
 
         const totalSeconds = (nextSession.time_limit_minutes ?? 0) * 60;
+        const elapsedSeconds = sessionElapsedSeconds(nextSession);
         totalSecondsRef.current = totalSeconds;
-        setTimerSeconds(nextSession.mode === "exam" ? totalSeconds : 0);
-        startedAtRef.current = Date.now();
+        setTimerSeconds(nextSession.mode === "exam" ? Math.max(totalSeconds - elapsedSeconds, 0) : elapsedSeconds);
+        startedAtRef.current = Date.now() - elapsedSeconds * 1000;
         autoFinishTriggeredRef.current = false;
 
         if (nextSession.status === "finished") {
           const result = await api.finishSession(token, sessionId);
           setFinishResult(result);
           setAnswers(mapAnswerResults(result.answers));
+          setResultReviewOpen(false);
         }
       })
       .catch((exception) => {
@@ -508,6 +549,7 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
       setAnswers(mapAnswerResults(result.answers));
       setSession((current) => (current ? { ...current, status: result.status } : current));
       setShowConfirm(false);
+      setResultReviewOpen(false);
     } catch (exception) {
       setError(exception instanceof ApiError ? exception.message : "Не удалось завершить тест");
     } finally {
@@ -515,11 +557,38 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
     }
   }
 
+  const routedPlannedTaskIdValue = searchParams.get("plannedTaskId");
+  const routedPlannedTaskId =
+    routedPlannedTaskIdValue && /^\d+$/.test(routedPlannedTaskIdValue) ? Number(routedPlannedTaskIdValue) : null;
+
+  function getAccreditationReturnPath() {
+    return buildAccreditationReturnRoute({
+      plannedTaskId: routedPlannedTaskId,
+      simulationId: finishResult?.simulation_id ?? session?.simulation_id ?? null,
+      stage: "test_stage",
+    });
+  }
+
+  function isStrictAccreditationSession() {
+    return Boolean(finishResult?.simulation_id ?? session?.simulation_id) ||
+      (finishResult?.attempt_context ?? session?.attempt_context) === "strict_simulation";
+  }
+
   function handleGoDashboard() {
+    if (isStrictAccreditationSession()) {
+      navigate(getAccreditationReturnPath());
+      return;
+    }
+
     navigate("/app/dashboard");
   }
 
   function handleStartNewTest() {
+    if (isStrictAccreditationSession()) {
+      navigate(getAccreditationReturnPath());
+      return;
+    }
+
     navigate("/app/practice");
   }
 
@@ -607,9 +676,14 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
         ? "Внимание"
         : "Время сессии"
     : "Прошло времени";
-  const elapsedSeconds = Math.floor((Date.now() - startedAtRef.current) / 1000);
+  const fallbackElapsedSeconds = Math.floor((Date.now() - startedAtRef.current) / 1000);
+  const elapsedSeconds = finishResult ? finishElapsedSeconds(finishResult, fallbackElapsedSeconds) : fallbackElapsedSeconds;
   const resultPercent = finishResult ? Math.round(finishResult.score_percent) : 0;
-  const resultPassed = finishResult ? finishResult.score_percent >= 70 : false;
+  const resultPassed = finishResult ? finishResult.score_percent >= TRAINING_PASS_PERCENT : false;
+  const resultMastered = finishResult ? finishResult.score_percent >= TRAINING_MASTERY_PERCENT : false;
+  const resultFullyPassed = strictAccreditationMode || controlExamMode ? resultPassed : resultMastered;
+  const resultToneColor = resultFullyPassed ? "var(--green)" : resultPassed ? "var(--gold)" : "var(--accent)";
+  const resultVerdictClass = resultFullyPassed ? styles["v-pass"] : resultPassed ? styles["v-ok"] : styles["v-fail"];
   const resultMinutes = Math.floor(elapsedSeconds / 60);
   const resultSeconds = elapsedSeconds % 60;
   const sessionKicker = examMode
@@ -640,19 +714,23 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
     ? strictAccreditationMode
       ? "Этап учтен в протоколе пробной аккредитации. Просмотри результат и разбор ошибок."
       : controlExamMode
-        ? "Контроль учтен в учебном прогнозе. Просмотри результат и разбор ошибок."
-        : "Просмотри результат и разбор ошибок или сразу запусти новый тест."
+        ? "Хороший результат. Мы учли его в плане подготовки и оставили только темы, которые стоит дополнительно укрепить."
+        : resultMastered
+          ? "Порог освоения 85% пройден. Просмотри разбор ошибок или сразу запусти новый тест."
+          : "Порог 70% пройден. Разбор поможет добрать результат до освоения 85%."
     : strictAccreditationMode
       ? "Порог не достигнут. Этот этап не зачтен; разберите ошибки перед новой пробной аккредитацией."
       : controlExamMode
-        ? "Порог не достигнут. Контроль останется учебным сигналом для пересчета маршрута."
+        ? "Результат пока невысокий. Мы составили для вас план подготовки по слабым темам, начните с разбора ошибок."
         : "Порог не достигнут. Просмотри разбор ошибок и запусти повторную попытку.";
   const resultVerdictLabel = resultPassed
     ? strictAccreditationMode
       ? "Аккредитационный порог пройден"
       : controlExamMode
         ? "Контрольный порог пройден"
-        : "Порог пройден"
+        : resultMastered
+          ? "Освоено (85%+)"
+          : "Порог 70% пройден"
     : "Порог не достигнут (70%)";
   const resultModeLabel = strictAccreditationMode
     ? "Пробная аккредитация"
@@ -729,60 +807,41 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
         ) : null}
 
         {finishResult ? (
-          <div className={styles["result-wrap"]} data-testid="test-session-result">
-            <div>
-              <div className={styles["result-header-kicker"]}>Тест завершён</div>
-              <h1 className={styles["result-header-title"]}>
-                {resultPassed ? "Сессия завершена" : "Сессия"}
-                <br />
-                <em>{resultPassed ? "успешно" : "не пройдена"}</em>
-              </h1>
-              <p className={styles["result-header-subtitle"]} data-testid="test-session-result-subtitle">
-                {resultSubtitle}
-              </p>
-            </div>
-
-            <div className={styles["result-hero"]}>
-              <div className={styles["result-glow"]} />
-              <div className={styles["result-inner"]}>
-                <div className={styles["ring-wrap"]}>
-                  <ResultRing color={resultPassed ? "var(--green)" : "var(--accent)"} value={resultPercent} />
-                  <div className={styles["ring-inner"]}>
-                    <AnimatedRingValue value={resultPercent} />
-                    <div className={styles["ring-lbl"]}>Точность</div>
+          <div
+            className={`${styles["result-wrap"]} ${resultReviewOpen ? styles["result-review-wrap"] : ""}`.trim()}
+            data-testid="test-session-result"
+          >
+            <div className={styles["result-modal-card"]}>
+              {!resultReviewOpen ? (
+                <>
+                  <div className={styles["ring-wrap"]}>
+                    <ResultRing color={resultToneColor} value={resultPercent} />
+                    <div className={styles["ring-inner"]}>
+                      <AnimatedRingValue value={resultPercent} />
+                      <div className={styles["ring-lbl"]}>Точность</div>
+                    </div>
                   </div>
-                </div>
 
-                <div className={styles["result-info"]}>
+                  <h2 className={styles["result-title"]}>
+                    {resultMastered ? "Материал освоен!" : resultPassed ? "Порог пройден" : "Нужно повторить"}
+                  </h2>
+                  <p className={styles["result-sub"]} data-testid="test-session-result-subtitle">
+                    {resultSubtitle}
+                  </p>
                   <div
-                    className={`${styles.verdict} ${resultPassed ? styles["v-pass"] : styles["v-fail"]}`.trim()}
+                    className={`${styles.verdict} ${resultVerdictClass}`.trim()}
                     data-testid="test-session-result-verdict"
                   >
                     {resultPassed ? <ResultPassIcon /> : <ResultFailIcon />}
                     {resultVerdictLabel}
                   </div>
-                  <h2 className={styles["result-title"]}>
-                    {finishResult.correct_answers} из {finishResult.total_questions}
-                    <br />
-                    <em>{resultPassed ? "правильных ответов" : "нужно повторить"}</em>
-                  </h2>
-                  <p className={styles["result-sub"]} data-testid="test-session-result-mode">
-                    Точность {resultPercent}% · Отвечено {finishResult.answered_questions} из {finishResult.total_questions} ·{" "}
-                    {resultModeLabel}
-                  </p>
+
                   <div className={styles["result-metrics"]}>
                     <div className={styles.rmet}>
-                      <div className={styles["rmet-lbl"]}>Точность</div>
-                      <div
-                        className={styles["rmet-val"]}
-                        style={{ color: resultPassed ? "var(--green)" : "var(--accent)" } as CSSProperties}
-                      >
-                        {resultPercent}%
-                      </div>
-                    </div>
-                    <div className={styles.rmet}>
                       <div className={styles["rmet-lbl"]}>Верно</div>
-                      <div className={styles["rmet-val"]}>{finishResult.correct_answers}</div>
+                      <div className={styles["rmet-val"]}>
+                        {finishResult.correct_answers}/{finishResult.total_questions}
+                      </div>
                     </div>
                     <div className={styles.rmet}>
                       <div className={styles["rmet-lbl"]}>Время</div>
@@ -791,71 +850,159 @@ export function TestsSessionExperience({ sessionId }: { sessionId: string }) {
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
 
-            <div>
-              <div className={styles["sec-lbl"]}>Разбор ответов</div>
-              <div className={styles["review-list"]}>
-                {session.questions.map((reviewQuestion, index) => {
-                  const answer = answers[reviewQuestion.id];
-                  const answered = Boolean(answer);
-                  const correct = answer?.response.is_correct === true;
-                  const tone = !answered ? styles["sb-new"] : correct ? styles["sb-green"] : styles["sb-accent"];
-                  const label = !answered ? "Пропущен" : correct ? "Верно" : "Ошибка";
-                  const shortText =
-                    reviewQuestion.text.length > 95 ? `${reviewQuestion.text.slice(0, 95)}...` : reviewQuestion.text;
-
-                  return (
+                  <div className={styles["result-acts"]}>
                     <button
-                      className={styles["rev-row"]}
-                      data-testid={`test-review-question-${reviewQuestion.id}`}
-                      key={reviewQuestion.id}
-                      onClick={() => setSelectedReviewQuestionId(reviewQuestion.id)}
+                      className={`${styles.btn} ${styles["btn-p"]}`.trim()}
+                      onClick={() => setResultReviewOpen(true)}
+                      onMouseDown={setRipplePosition}
                       type="button"
                     >
-                      <div className={styles["rev-head"]}>
-                        <div className={styles["rev-num"]}>{String(index + 1).padStart(2, "0")}</div>
-                        <div style={{ flex: 1 }}>
-                          <div className={styles["rev-q"]} title={reviewQuestion.text}>{shortText}</div>
-                          <div className={styles["rev-meta"]}>
-                            {answer
-                              ? `Ответ: ${answer.selectedOptionLabel} · Верно: ${answer.response.correct_option_label ?? "—"}`
-                              : "Не отвечен"}
+                      <span className={styles["btn-rip"]} />
+                      Посмотреть разбор
+                    </button>
+                    <button
+                      className={`${styles.btn} ${styles["btn-o"]}`.trim()}
+                      onClick={handleGoDashboard}
+                      onMouseDown={setRipplePosition}
+                      type="button"
+                    >
+                      <span className={styles["btn-rip"]} />
+                      <ResultHomeIcon />
+                      {isStrictAccreditationSession() ? "В аккредитацию" : "На главную"}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <div className={styles["result-header-kicker"]}>Тест завершён</div>
+                    <h1 className={styles["result-header-title"]}>
+                      {resultMastered ? "Материал" : resultPassed ? "Порог" : "Сессия"}
+                      <br />
+                      <em>{resultMastered ? "освоен" : resultPassed ? "пройден" : "не пройдена"}</em>
+                    </h1>
+                    <p className={styles["result-header-subtitle"]} data-testid="test-session-result-subtitle">
+                      {resultSubtitle}
+                    </p>
+                  </div>
+
+                  <div className={styles["result-hero"]}>
+                    <div className={styles["result-glow"]} />
+                    <div className={styles["result-inner"]}>
+                      <div className={styles["ring-wrap"]}>
+                        <ResultRing color={resultToneColor} value={resultPercent} />
+                        <div className={styles["ring-inner"]}>
+                          <AnimatedRingValue value={resultPercent} />
+                          <div className={styles["ring-lbl"]}>Точность</div>
+                        </div>
+                      </div>
+
+                      <div className={styles["result-info"]}>
+                        <div
+                          className={`${styles.verdict} ${resultVerdictClass}`.trim()}
+                          data-testid="test-session-result-verdict"
+                        >
+                          {resultPassed ? <ResultPassIcon /> : <ResultFailIcon />}
+                          {resultVerdictLabel}
+                        </div>
+                        <h2 className={styles["result-title"]}>
+                          {finishResult.correct_answers} из {finishResult.total_questions}
+                          <br />
+                          <em>{resultMastered ? "освоено" : resultPassed ? "порог пройден" : "нужно повторить"}</em>
+                        </h2>
+                        <p className={styles["result-sub"]} data-testid="test-session-result-mode">
+                          Точность {resultPercent}% · Отвечено {finishResult.answered_questions} из {finishResult.total_questions} ·{" "}
+                          {resultModeLabel}
+                        </p>
+                        <div className={styles["result-metrics"]}>
+                          <div className={styles.rmet}>
+                            <div className={styles["rmet-lbl"]}>Точность</div>
+                            <div
+                              className={styles["rmet-val"]}
+                              style={{ color: resultToneColor } as CSSProperties}
+                            >
+                              {resultPercent}%
+                            </div>
+                          </div>
+                          <div className={styles.rmet}>
+                            <div className={styles["rmet-lbl"]}>Верно</div>
+                            <div className={styles["rmet-val"]}>{finishResult.correct_answers}</div>
+                          </div>
+                          <div className={styles.rmet}>
+                            <div className={styles["rmet-lbl"]}>Время</div>
+                            <div className={`${styles["rmet-val"]} ${styles.mono}`.trim()}>
+                              {String(resultMinutes).padStart(2, "0")}:{String(resultSeconds).padStart(2, "0")}
+                            </div>
                           </div>
                         </div>
-                        <span className={`${styles.sbadge} ${tone}`.trim()}>{label}</span>
                       </div>
-                      {answer && answer.response.is_correct === false && answer.response.explanation ? (
-                        <div className={styles["rev-expl"]}>{answer.response.explanation}</div>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+                    </div>
+                  </div>
 
-            <div className={styles["result-acts"]}>
-              <button
-                className={`${styles.btn} ${styles["btn-p"]}`.trim()}
-                onClick={handleGoDashboard}
-                onMouseDown={setRipplePosition}
-                type="button"
-              >
-                <span className={styles["btn-rip"]} />
-                <ResultHomeIcon />
-                На главную
-              </button>
-              <button
-                className={`${styles.btn} ${styles["btn-o"]}`.trim()}
-                onClick={handleStartNewTest}
-                onMouseDown={setRipplePosition}
-                type="button"
-              >
-                <span className={styles["btn-rip"]} />
-                Новый тест
-              </button>
+                  <div>
+                    <div className={styles["sec-lbl"]}>Разбор ответов</div>
+                    <div className={styles["review-list"]}>
+                      {session.questions.map((reviewQuestion, index) => {
+                        const answer = answers[reviewQuestion.id];
+                        const answered = Boolean(answer);
+                        const correct = answer?.response.is_correct === true;
+                        const tone = !answered ? styles["sb-new"] : correct ? styles["sb-green"] : styles["sb-accent"];
+                        const label = !answered ? "Пропущен" : correct ? "Верно" : "Ошибка";
+                        const shortText =
+                          reviewQuestion.text.length > 95 ? `${reviewQuestion.text.slice(0, 95)}...` : reviewQuestion.text;
+
+                        return (
+                          <button
+                            className={styles["rev-row"]}
+                            data-testid={`test-review-question-${reviewQuestion.id}`}
+                            key={reviewQuestion.id}
+                            onClick={() => setSelectedReviewQuestionId(reviewQuestion.id)}
+                            type="button"
+                          >
+                            <div className={styles["rev-head"]}>
+                              <div className={styles["rev-num"]}>{String(index + 1).padStart(2, "0")}</div>
+                              <div style={{ flex: 1 }}>
+                                <div className={styles["rev-q"]} title={reviewQuestion.text}>{shortText}</div>
+                                <div className={styles["rev-meta"]}>
+                                  {answer
+                                    ? `Ответ: ${answer.selectedOptionLabel} · Верно: ${answer.response.correct_option_label ?? "—"}`
+                                    : "Не отвечен"}
+                                </div>
+                              </div>
+                              <span className={`${styles.sbadge} ${tone}`.trim()}>{label}</span>
+                            </div>
+                            {answer && answer.response.is_correct === false && answer.response.explanation ? (
+                              <div className={styles["rev-expl"]}>{answer.response.explanation}</div>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className={styles["result-acts"]}>
+                    <button
+                      className={`${styles.btn} ${styles["btn-o"]}`.trim()}
+                      onClick={() => setResultReviewOpen(false)}
+                      onMouseDown={setRipplePosition}
+                      type="button"
+                    >
+                      <span className={styles["btn-rip"]} />
+                      К результату
+                    </button>
+                    <button
+                      className={`${styles.btn} ${styles["btn-p"]}`.trim()}
+                      onClick={handleStartNewTest}
+                      onMouseDown={setRipplePosition}
+                      type="button"
+                    >
+                      <span className={styles["btn-rip"]} />
+                      {isStrictAccreditationSession() ? "В аккредитацию" : "Новый тест"}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ) : (

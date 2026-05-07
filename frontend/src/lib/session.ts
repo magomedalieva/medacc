@@ -79,6 +79,33 @@ export function buildAccreditationTaskRoute(task: PlanTask) {
   return `/app/accreditation?${searchParams.toString()}`;
 }
 
+export function buildAccreditationReturnRoute({
+  plannedTaskId,
+  simulationId,
+  stage,
+}: {
+  plannedTaskId?: number | null;
+  simulationId?: string | null;
+  stage?: string | null;
+}) {
+  const searchParams = new URLSearchParams();
+
+  if (plannedTaskId !== null && plannedTaskId !== undefined) {
+    searchParams.set("plannedTaskId", String(plannedTaskId));
+  }
+
+  if (simulationId) {
+    searchParams.set("simulationId", simulationId);
+  }
+
+  if (stage) {
+    searchParams.set("stage", stage);
+  }
+
+  const query = searchParams.toString();
+  return query ? `/app/accreditation?${query}` : "/app/accreditation";
+}
+
 export function buildSessionPayloadFromTask(task: PlanTask) {
   return {
     topic_id: task.topic_id,

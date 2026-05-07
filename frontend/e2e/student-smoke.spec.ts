@@ -61,13 +61,14 @@ function buildStudentCredentials(): StudentCredentials {
 
 async function registerStudent(page: Page, credentials: StudentCredentials) {
   await page.goto("/auth");
-  await page.getByRole("tab", { name: "Регистрация" }).click();
+  await page.getByRole("button", { name: "Начать подготовку" }).click();
+  await expect(page.getByRole("tab", { name: "Регистрация" })).toHaveAttribute("aria-selected", "true");
 
   await page.getByLabel("Имя").fill(credentials.firstName);
   await page.getByLabel("Фамилия").fill(credentials.lastName);
   await page.getByLabel("Электронная почта").fill(credentials.email);
-  await page.getByLabel("Пароль").fill(credentials.password);
-  await page.getByLabel("Повтор пароля").fill(credentials.password);
+  await page.getByLabel("Пароль", { exact: true }).fill(credentials.password);
+  await page.getByLabel("Повтор пароля", { exact: true }).fill(credentials.password);
   await page.getByRole("button", { name: "Создать аккаунт" }).click();
 
   await expect(page).toHaveURL(/\/app\/onboarding$/);
@@ -166,7 +167,7 @@ test.describe("student smoke journeys", () => {
     expect(JSON.stringify(osceStage.details)).not.toContain("correct_option_label");
 
     await page.getByTestId("accreditation-stage-cases-start").click();
-    await expect(page).toHaveURL(/\/app\/cases/);
+    await expect(page).toHaveURL(/\/app\/accreditation\/cases/);
     const casesUrl = new URL(page.url());
     expect(casesUrl.searchParams.get("simulationId")).toBe(activeSimulation!.id);
     expect(casesUrl.searchParams.get("caseSlugs")?.split(",")).toEqual(assignedCaseSlugs);
@@ -189,6 +190,15 @@ test.describe("student smoke journeys", () => {
     expect(rejectedAttemptBody).toMatchObject({
       detail: expect.stringContaining("не входит в состав"),
     });
+
+    await page.goto("/app/accreditation");
+    await expect(page.getByTestId("accreditation-page")).toBeVisible();
+    await page.getByTestId("accreditation-stage-osce-start").click();
+    await expect(page).toHaveURL(/\/app\/accreditation\/osce/);
+    const osceUrl = new URL(page.url());
+    expect(osceUrl.searchParams.get("simulationId")).toBe(activeSimulation!.id);
+    expect(osceUrl.searchParams.get("stationSlugs")?.split(",")).toEqual(assignedStationSlugs);
+    await expect(page.getByTestId("osce-station-modal")).toBeVisible();
 
     await api.dispose();
   });
@@ -271,9 +281,10 @@ test.describe("student smoke journeys", () => {
     await page.getByTestId("test-session-confirm-finish").click();
 
     await expect(page.getByTestId("test-session-result")).toBeVisible();
-    await expect(page.getByTestId("test-session-result-subtitle")).toContainText("Контроль останется учебным сигналом");
-    await expect(page.getByTestId("test-session-result-mode")).toContainText("Контроль без подсказок");
+    await expect(page.getByTestId("test-session-result-subtitle")).toContainText("Результат пока невысокий");
     await expect(page.getByTestId("test-session-result-verdict")).toContainText("Порог не достигнут");
+    await page.getByRole("button", { name: "Посмотреть разбор" }).click();
+    await expect(page.getByTestId("test-session-result-mode")).toContainText("Контроль без подсказок");
     await expect.poll(async () => (await getSimulations(api)).length).toBe(0);
 
     await api.dispose();
@@ -308,11 +319,20 @@ test.describe("student smoke journeys", () => {
 
     await page.goto(`/app/tests/${session.id}`);
     await expect(page.getByTestId("test-session-page")).toBeVisible();
-    await expect(page.getByTestId("test-session-kicker")).toContainText("Экзаменационная сессия");
+    await expect(page.getByTestId("test-session-kicker")).toContainText("Этап пробной аккредитации");
     await expect(page.getByTestId("test-session-title")).toContainText("Пробная аккредитация");
     await expect(page.getByTestId("test-session-subtitle")).toContainText("Строгий режим пробной аккредитации");
-    await expect(page.getByTestId("test-session-mode-label")).toContainText("Экзаменационный режим");
-    await expect(page.getByTestId("test-session-exam-feedback-subtitle")).toContainText("Симуляция аккредитации");
+    await expect(page.getByTestId("test-session-mode-label")).toContainText("Пробная аккредитация");
+    await expect(page.getByTestId("test-session-exam-feedback-subtitle")).toContainText("Пробная аккредитация");
+
+    await page.getByTestId("test-session-finish-early").click();
+    await page.getByTestId("test-session-confirm-finish").click();
+    await expect(page.getByTestId("test-session-result")).toBeVisible();
+    await page.getByRole("button", { name: "В аккредитацию" }).click();
+    await expect(page).toHaveURL(/\/app\/accreditation/);
+    const accreditationUrl = new URL(page.url());
+    expect(accreditationUrl.searchParams.get("simulationId")).toBe(simulation.id);
+    expect(accreditationUrl.searchParams.get("stage")).toBe("test_stage");
 
     await api.dispose();
   });
@@ -358,6 +378,7 @@ test.describe("student smoke journeys", () => {
 
     await expect(page.getByTestId("test-session-result")).toBeVisible();
 
+    await page.getByRole("button", { name: "Посмотреть разбор" }).click();
     await page.getByTestId(`test-review-question-${firstQuestion.id}`).click();
     const reviewDialog = page.getByRole("dialog", { name: "Вопрос 1" });
     await expect(reviewDialog).toBeVisible();
@@ -449,7 +470,7 @@ test.describe("student smoke journeys", () => {
       .toBe(true);
 
     await page.goto("/app/schedule");
-    await expect(page.getByTestId(`schedule-task-start-${plannedOsceTask!.id}`)).toBeDisabled();
+    await expect(page.getByTestId(`schedule-task-${plannedOsceTask!.id}`)).toBeDisabled();
 
     await api.dispose();
   });
@@ -484,6 +505,11 @@ test.describe("student smoke journeys", () => {
       await page.getByTestId("cases-next-step").click();
     }
 
+    await expect(aiResult).toBeVisible();
+    await aiResult.getByRole("button", { name: "Посмотреть разбор" }).click();
+    await expect(page.getByTestId("cases-review-page")).toBeVisible();
+    await expect(aiResult).toBeHidden();
+    await page.getByRole("button", { name: "К результату" }).click();
     await expect(aiResult).toBeVisible();
   });
 
@@ -548,8 +574,10 @@ test.describe("student smoke journeys", () => {
     await page.getByTestId("app-logout").click();
     await expect(page).toHaveURL(/\/auth$/);
 
+    await page.getByRole("button", { name: "MedAcc" }).click();
+    await expect(page.getByRole("tab", { name: "Вход" })).toHaveAttribute("aria-selected", "true");
     await page.getByLabel("Электронная почта").fill(credentials.email);
-    await page.getByLabel("Пароль").fill(nextPassword);
+    await page.getByLabel("Пароль", { exact: true }).fill(nextPassword);
     await page.getByRole("button", { name: "Войти" }).click();
 
     await expect(page).toHaveURL(/\/app\/dashboard$/);

@@ -430,7 +430,7 @@ export const api = {
     });
   },
   getExamProtocol(token: string, signal?: AbortSignal) {
-    return request<ExamReadinessProtocol>("/analytics/exam/protocol", {
+    return request<ExamReadinessProtocol>("/accreditation/protocol", {
       token,
       signal,
       cacheTtlMs: SHORT_GET_CACHE_TTL_MS,

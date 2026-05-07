@@ -231,6 +231,36 @@ export default function App() {
           }
         />
         <Route
+          path="accreditation/cases"
+          element={
+            <StudentReady>
+              <ScreenBoundary label="Готовим кейсы пробной аккредитации">
+                <CasesPage />
+              </ScreenBoundary>
+            </StudentReady>
+          }
+        />
+        <Route
+          path="accreditation/osce"
+          element={
+            <StudentReady>
+              <ScreenBoundary label="Готовим ОСКЭ пробной аккредитации">
+                <OscePage />
+              </ScreenBoundary>
+            </StudentReady>
+          }
+        />
+        <Route
+          path="accreditation/osce/:slug"
+          element={
+            <StudentReady>
+              <ScreenBoundary label="Готовим станцию ОСКЭ пробной аккредитации">
+                <OsceStationPage />
+              </ScreenBoundary>
+            </StudentReady>
+          }
+        />
+        <Route
           path="cases"
           element={
             <StudentReady>

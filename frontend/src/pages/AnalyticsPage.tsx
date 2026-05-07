@@ -49,6 +49,9 @@ type ReadinessMetric = {
   action: string;
 };
 
+const TRAINING_PASS_PERCENT = 70;
+const TRAINING_MASTERY_PERCENT = 85;
+
 type RepeatingErrorGroup = {
   key: string;
   topicId: number | null;
@@ -472,22 +475,22 @@ function topicLabel(status: string): string {
   }
 
   if (status === "weak") {
-    return "Риск";
+    return "Нужно повторить";
   }
 
   if (status === "medium") {
-    return "В работе";
+    return "Зачтено";
   }
 
-  return "Хорошо";
+  return "Освоено";
 }
 
 function accuracyTone(accuracyPercent: number): Tone {
-  if (accuracyPercent >= 80) {
+  if (accuracyPercent >= TRAINING_MASTERY_PERCENT) {
     return "green";
   }
 
-  if (accuracyPercent >= 60) {
+  if (accuracyPercent >= TRAINING_PASS_PERCENT) {
     return "warm";
   }
 
@@ -519,12 +522,12 @@ function caseTone(accuracyPercent: number): Tone {
 }
 
 function caseLabel(accuracyPercent: number): string {
-  if (accuracyPercent >= 80) {
-    return "Уверенно";
+  if (accuracyPercent >= TRAINING_MASTERY_PERCENT) {
+    return "Освоено";
   }
 
-  if (accuracyPercent >= 60) {
-    return "Нужно добрать";
+  if (accuracyPercent >= TRAINING_PASS_PERCENT) {
+    return "Зачтено";
   }
 
   return "Риск";
@@ -928,7 +931,7 @@ function buildTopicCaption(topic: TopicAnalytics): string {
   const markers = [
     topic.test_incorrect_answers > 0 ? `ошибки ${topic.test_incorrect_answers}` : null,
     topic.repeated_question_struggles > 0 ? `повторы ${topic.repeated_question_struggles}` : null,
-    topic.hard_question_accuracy_percent !== null && topic.hard_question_accuracy_percent < 80
+    topic.hard_question_accuracy_percent !== null && topic.hard_question_accuracy_percent < TRAINING_MASTERY_PERCENT
       ? "сложные вопросы проседают"
       : null,
     topic.case_attempts_count > 0 ? `кейсы ${topic.case_attempts_count}` : null,
@@ -1612,7 +1615,7 @@ export function AnalyticsPage() {
   }, [state?.caseAttempts, state?.cases]);
 
   const focusedCaseTopics = useMemo(() => {
-    return caseTopicFocusItems.filter((group) => group.worstAccuracy !== null && group.worstAccuracy < 80);
+    return caseTopicFocusItems.filter((group) => group.worstAccuracy !== null && group.worstAccuracy < TRAINING_MASTERY_PERCENT);
   }, [caseTopicFocusItems]);
 
   const caseReviewTopics = useMemo(() => {
@@ -2446,8 +2449,8 @@ export function AnalyticsPage() {
                     <strong>{incorrectAnswers}</strong>
                   </span>
                   <span>
-                    <small>Порог</small>
-                    <strong>70%</strong>
+                    <small>Зачёт / освоение</small>
+                    <strong>70/85%</strong>
                   </span>
                 </div>
 
@@ -3486,8 +3489,8 @@ export function AnalyticsPage() {
                 <strong>{hasTopicResult ? `${Math.round(topic.accuracy_percent)}%` : "-"}</strong>
               </div>
               <div className={styles["test-topic-modal-stat"]}>
-                <span>Порог</span>
-                <strong>70%</strong>
+                <span>Зачёт / освоение</span>
+                <strong>70/85%</strong>
               </div>
               <div className={styles["test-topic-modal-stat"]}>
                 <span>Статус</span>

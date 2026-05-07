@@ -387,6 +387,9 @@ class TestService:
             answered_questions=answered_questions,
             total_questions=test_session.total_questions,
             status=test_session.status.value,
+            started_at=self._as_aware_datetime(test_session.started_at),
+            finished_at=self._as_aware_datetime(test_session.finished_at) if test_session.finished_at is not None else None,
+            server_time=utc_now(),
             answers=self._build_answer_results(test_session, questions, reveal_feedback=True),
         )
 
@@ -434,6 +437,9 @@ class TestService:
             total_questions=test_session.total_questions,
             current_index=test_session.current_index,
             time_limit_minutes=test_session.time_limit_minutes,
+            started_at=self._as_aware_datetime(test_session.started_at),
+            finished_at=self._as_aware_datetime(test_session.finished_at) if test_session.finished_at is not None else None,
+            server_time=utc_now(),
             questions=[self._to_question_response(question) for question in questions],
             answers=(
                 answer_results

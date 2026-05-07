@@ -82,7 +82,7 @@ TOPIC_EARLY_SIGNAL_QUESTIONS = 4
 TOPIC_CONFIDENCE_QUESTIONS = 12
 TOPIC_CRITICAL_ACCURACY_PERCENT = 55.0
 TOPIC_LOW_ACCURACY_PERCENT = 70.0
-TOPIC_STABLE_ACCURACY_PERCENT = 82.0
+TOPIC_STABLE_ACCURACY_PERCENT = 85.0
 TOPIC_PRIMARY_BAND_MIN = 3
 TOPIC_FRESH_STRUGGLE_DAYS = 3
 TOPIC_RECENT_STRUGGLE_DAYS = 7
@@ -3596,7 +3596,7 @@ class ScheduleService:
         if topic.status == "stable":
             return True
 
-        return topic.status == "developing" and topic.accuracy_percent >= 75.0
+        return topic.status == "developing" and topic.accuracy_percent >= TOPIC_STABLE_ACCURACY_PERCENT
 
     def _build_osce_task(self, plan_id: int, scheduled_date: date, station: PlannedOsceStation) -> PlanTask:
         return PlanTask(

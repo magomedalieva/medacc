@@ -199,9 +199,9 @@ export function DashboardProgressPanel({
             <span className={styles.levelText}>
               {isInitialState
                 ? "Пока нет данных"
-                : readinessPercent >= 80
+                : readinessPercent >= 85
                 ? "Хороший уровень"
-                : readinessPercent >= 60
+                : readinessPercent >= 70
                   ? "Средний уровень"
                   : "Нужно добрать"}
             </span>

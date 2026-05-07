@@ -151,14 +151,14 @@ function statusBadgeLabel(analytics: TopicAnalytics | undefined) {
   }
 
   if (analytics.status === "weak") {
-    return "Слабая зона";
+    return "Нужно повторить";
   }
 
   if (analytics.status === "medium") {
-    return "Средняя";
+    return "Зачтено";
   }
 
-  return "Хорошая";
+  return "Освоено";
 }
 
 function fillColor(tone: "green" | "warm" | "accent" | "new") {

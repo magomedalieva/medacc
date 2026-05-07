@@ -98,9 +98,9 @@ class ClinicalCaseService:
         if len(clinical_case.quiz_questions) == 0:
             raise BadRequestError("Кейс не содержит проверочных вопросов")
 
-            if payload.simulation_id is not None:
-                if payload.mode != "exam":
-                    raise BadRequestError("Кейсовый этап пробной аккредитации доступен только в контрольном режиме")
+        if payload.simulation_id is not None:
+            if payload.mode != "exam":
+                raise BadRequestError("Кейсовый этап пробной аккредитации доступен только в контрольном режиме")
 
             await AccreditationService(self.session).ensure_case_can_start(user, payload.simulation_id, clinical_case.slug)
 

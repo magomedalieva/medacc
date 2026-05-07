@@ -592,7 +592,17 @@ export function AccreditationPage() {
           simulation_id: activeSimulation.id,
         });
 
-        startTransition(() => navigate(`/app/tests/${session.id}`));
+        const testParams = new URLSearchParams();
+        testParams.set("simulationId", activeSimulation.id);
+        testParams.set("stage", "test_stage");
+
+        const stagePlannedTaskId = plannedTaskIdForStage("tests");
+
+        if (stagePlannedTaskId !== null) {
+          testParams.set("plannedTaskId", String(stagePlannedTaskId));
+        }
+
+        startTransition(() => navigate(`/app/tests/${session.id}?${testParams.toString()}`));
         return;
       }
 
@@ -618,7 +628,7 @@ export function AccreditationPage() {
           params.set("topicId", String(routedTopicId));
         }
 
-        startTransition(() => navigate(`/app/cases?${params.toString()}`));
+        startTransition(() => navigate(`/app/accreditation/cases?${params.toString()}`));
         return;
       }
 
@@ -632,7 +642,7 @@ export function AccreditationPage() {
         params.set("stationSlug", routedStationSlug);
       }
 
-      startTransition(() => navigate(`/app/osce?${params.toString()}`));
+      startTransition(() => navigate(`/app/accreditation/osce?${params.toString()}`));
     } catch (error) {
       setNotice({
         message: error instanceof ApiError ? error.message : "Не удалось открыть этап пробной аккредитации",

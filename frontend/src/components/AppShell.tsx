@@ -15,6 +15,8 @@ export function AppShell() {
   const isStandaloneStudentScreen =
     location.pathname === "/app/onboarding" ||
     location.pathname === "/app/practice" ||
+    location.pathname.startsWith("/app/accreditation/cases") ||
+    location.pathname.startsWith("/app/accreditation/osce") ||
     location.pathname === "/app/cases" ||
     location.pathname.startsWith("/app/osce") ||
     location.pathname.startsWith("/app/tests/");

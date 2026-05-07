@@ -469,6 +469,9 @@ export interface TestSession {
   total_questions: number;
   current_index: number;
   time_limit_minutes: number | null;
+  started_at: string;
+  finished_at: string | null;
+  server_time: string;
   questions: Question[];
   answers: TestSessionAnswerResponse[];
 }
@@ -490,6 +493,9 @@ export interface TestSessionFinishResponse {
   answered_questions: number;
   total_questions: number;
   status: string;
+  started_at: string;
+  finished_at: string | null;
+  server_time: string;
   answers: TestSessionAnswerResponse[];
 }
 
