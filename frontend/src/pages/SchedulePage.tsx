@@ -425,6 +425,13 @@ export function SchedulePage() {
   const nextStudyDate = todayIsStudyDay
     ? serverToday
     : findNextAllowedStudyDate(serverToday, activeStudyWeekdays, rescheduleMaxDate);
+  const studyDateLabel = nextStudyDate === serverToday ? "Учебная дата" : "Следующая учебная дата";
+  const studyDateValue = nextStudyDate
+    ? nextStudyDate === serverToday
+      ? `Сегодня, ${dayMonthLabel(nextStudyDate)}`
+      : fullDateLabel(nextStudyDate)
+    : "Нет учебной даты";
+  const todayStatusValue = todayIsStudyDay ? (todayHasStudyTime ? "Можно заниматься" : "Лимит закрыт") : "Пауза по режиму";
   const hasPreferenceChanges = Boolean(
     user &&
       (Number(dailyStudyMinutes) !== user.daily_study_minutes ||
@@ -674,9 +681,13 @@ export function SchedulePage() {
     setError(null);
 
     try {
-      await api.postponeTask(token, task.id);
+      const postponedTask = await api.postponeTask(token, task.id);
       pushToast("Задача перенесена, маршрут пересобран.", "warm");
-      await refreshSchedule("Задача перенесена, но план не удалось обновить", { selectFocus: true });
+      const nextSchedule = await refreshSchedule("Задача перенесена, но план не удалось обновить");
+
+      if (nextSchedule) {
+        selectDate(postponedTask.scheduled_date);
+      }
     } catch (exception) {
       setError(exception instanceof ApiError ? exception.message : "Не удалось перенести задачу");
     } finally {
@@ -913,17 +924,15 @@ export function SchedulePage() {
             <CalendarIcon />
           </span>
           <span>
-            <span className={styles["status-label"]}>Ближайшая учебная дата</span>
-            <strong>{nextStudyDate ? fullDateLabel(nextStudyDate) : "Нет учебной даты"}</strong>
+            <span className={styles["status-label"]}>{studyDateLabel}</span>
+            <strong>{studyDateValue}</strong>
           </span>
         </button>
         <div className={styles["status-cell"]}>
           <span className={cx(styles.dot, todayIsStudyDay && todayHasStudyTime ? styles.green : styles.pause)} />
           <span>
-            <span className={styles["status-label"]}>Статус на сегодня</span>
-            <strong>
-              {todayIsStudyDay ? (todayHasStudyTime ? "Сегодня учебный день" : "Лимит на сегодня закрыт") : "Сегодня пауза"}
-            </strong>
+            <span className={styles["status-label"]}>Состояние дня</span>
+            <strong>{todayStatusValue}</strong>
           </span>
         </div>
         <button
@@ -984,9 +993,10 @@ export function SchedulePage() {
                     </div>
                     {(tasksByDate[date] ?? [])
                       .filter(isTaskActive)
-                      .slice(0, isPrimaryDate ? 1 : 2)
-                      .map((task) => {
+                      .slice(0, 1)
+                      .map((task, taskIndex) => {
                         const canOpenTask = canStartTask(task, serverToday, activeStudyWeekdays, todayHasStudyTime);
+                        const routeDateText = isPrimaryDate ? "10:00" : taskIndex === 0 ? shortDateLabel(date) : "";
 
                         return (
                           <div
@@ -1003,7 +1013,7 @@ export function SchedulePage() {
                             tabIndex={0}
                           >
                             <span className={styles["route-time"]}>
-                              <strong>{isPrimaryDate ? "10:00" : shortDateLabel(date)}</strong>
+                              <strong>{routeDateText}</strong>
                             </span>
                             <span className={styles["route-copy"]}>
                               <strong>{buildTaskTitle(task)}</strong>

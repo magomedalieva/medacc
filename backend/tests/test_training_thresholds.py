@@ -109,9 +109,9 @@ def test_schedule_standard_planned_tests_use_full_question_blocks() -> None:
     load_profile = service._build_user_study_load_profile(user)
 
     assert load_profile.focused_test_question_count == FOCUSED_TEST_QUESTION_COUNT == 30
-    assert load_profile.focused_test_minutes == FOCUSED_TEST_MINUTES == 30
+    assert load_profile.focused_test_minutes == FOCUSED_TEST_MINUTES == 15
     assert load_profile.mixed_test_question_count == MIXED_TEST_QUESTION_COUNT == 50
-    assert load_profile.mixed_test_minutes == MIXED_TEST_MINUTES == 45
+    assert load_profile.mixed_test_minutes == MIXED_TEST_MINUTES == 25
 
 
 def test_schedule_special_review_tasks_are_not_tiny_blocks() -> None:

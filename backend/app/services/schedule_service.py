@@ -64,8 +64,8 @@ REINFORCEMENT_RATIO = 0.9
 FOCUSED_TEST_QUESTION_COUNT = 30
 MIXED_TEST_QUESTION_COUNT = 50
 EXAM_SIM_QUESTION_COUNT = 80
-FOCUSED_TEST_MINUTES = 30
-MIXED_TEST_MINUTES = 45
+FOCUSED_TEST_MINUTES = 15
+MIXED_TEST_MINUTES = 25
 EXAM_SIM_MINUTES = 60
 CASE_SIM_QUESTION_COUNT = CASE_QUIZ_QUESTION_COUNT
 CASE_SIM_MINUTES = 30
@@ -109,8 +109,8 @@ MAX_DAILY_STUDY_MINUTES = 180
 GENTLE_TASK_BUDGET_RATIO = 0.58
 STEADY_TASK_BUDGET_RATIO = 0.72
 INTENSIVE_TASK_BUDGET_RATIO = 0.86
-CASE_TASK_MINUTES_MIN = 25
-CASE_TASK_MINUTES_MAX = 42
+CASE_TASK_MINUTES_MIN = 20
+CASE_TASK_MINUTES_MAX = 30
 FINAL_PHASE_OVERALL_GATE_PERCENT = 55.0
 FINAL_PHASE_TEST_GATE_PERCENT = 60.0
 RECENT_ACTIVITY_WINDOW_DAYS = 14
@@ -857,12 +857,6 @@ class ScheduleService:
 
         deferred_task_signature = self._build_task_signature(task)
 
-        await self.study_plan_repository.delete_tasks_from_date_excluding_task(
-            task.plan_id,
-            target_date,
-            task.id,
-        )
-
         task.scheduled_date = target_date
         task.is_skipped = False
         task.is_completed = False
@@ -870,6 +864,8 @@ class ScheduleService:
         task.completed_at = None
         task.missed_at = None
         task.missed_reason = None
+
+        await self.session.flush()
 
         await self._replace_plan_from_date(
             user,
